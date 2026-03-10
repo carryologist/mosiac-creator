@@ -249,3 +249,31 @@ export async function generateMosaic(
     config,
   };
 }
+
+// =============================================================================
+// BrickLink Wanted List XML Export
+// =============================================================================
+
+/**
+ * Generate a BrickLink Wanted List XML string from a mosaic result.
+ * Users can upload this XML directly to BrickLink.com to create a wanted list,
+ * then use Easy Buy to order all parts from one or more sellers.
+ *
+ * Format: https://www.bricklink.com/help.asp?helpID=207
+ */
+export function generateWantedListXML(result: MosaicResult): string {
+  const items = result.partsList.map((entry) => {
+    return [
+      '  <ITEM>',
+      '    <ITEMTYPE>P</ITEMTYPE>',
+      `    <ITEMID>${entry.partNumber}</ITEMID>`,
+      `    <COLOR>${entry.bricklinkColorId}</COLOR>`,
+      `    <MINQTY>${entry.count}</MINQTY>`,
+      '    <CONDITION>N</CONDITION>',
+      '    <NOTIFY>N</NOTIFY>',
+      '  </ITEM>',
+    ].join('\n');
+  });
+
+  return ['<INVENTORY>', ...items, '</INVENTORY>', ''].join('\n');
+}
