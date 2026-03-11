@@ -4,6 +4,7 @@ import React, { useRef, useEffect, useState, useCallback } from "react";
 import * as THREE from "three";
 import { LDrawLoader } from "three/addons/loaders/LDrawLoader.js";
 import { LDrawUtils } from "three/addons/utils/LDrawUtils.js";
+import { LDrawConditionalLineMaterial } from "three/addons/materials/LDrawConditionalLineMaterial.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 const LDRAW_LIBRARY_URL = "/ldraw/";
@@ -143,6 +144,7 @@ export default function LDrawViewer({ ldrContent, height = 500 }: LDrawViewerPro
 
         // Feed color definitions to the loader via Blob URL
         const loader = new LDrawLoader();
+        loader.setConditionalLineMaterial(LDrawConditionalLineMaterial);
         const configBlob = new Blob([configText], { type: "text/plain" });
         const configBlobUrl = URL.createObjectURL(configBlob);
         try {
