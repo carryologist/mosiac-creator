@@ -19,15 +19,10 @@ interface ImageAdjustments {
 
 // ─── Step Indicator ──────────────────────────────────────────────────────────
 
-function StepIndicator({
-  currentStep,
-}: {
-  currentStep: number;
-}) {
+function StepIndicator({ currentStep }: { currentStep: number }) {
   const steps = [
     { num: 1, label: "Upload Image" },
-    { num: 2, label: "Configure" },
-    { num: 3, label: "Preview & Export" },
+    { num: 2, label: "Configure & Export" },
   ];
 
   return (
@@ -93,7 +88,7 @@ function Slider({
   max?: number;
 }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       <div className="flex items-center justify-between">
         <label className="text-sm font-medium text-gray-300">{label}</label>
         <span className="text-xs font-mono tabular-nums text-slate-400 bg-slate-700/50 px-2 py-0.5 rounded">
@@ -138,6 +133,157 @@ function Slider({
   );
 }
 
+// ─── Settings Panel (shared between configure and result views) ──────────────
+
+function SettingsPanel({
+  selectedSize,
+  onSizeChange,
+  pieceType,
+  onPieceTypeChange,
+  adjustments,
+  onAdjustmentsChange,
+  optimize,
+  onOptimizeChange,
+  imagePreview,
+  compact,
+}: {
+  selectedSize: MosaicSize;
+  onSizeChange: (s: MosaicSize) => void;
+  pieceType: PieceType;
+  onPieceTypeChange: (p: PieceType) => void;
+  adjustments: ImageAdjustments;
+  onAdjustmentsChange: (a: ImageAdjustments) => void;
+  optimize: boolean;
+  onOptimizeChange: (o: boolean) => void;
+  imagePreview: string | null;
+  compact?: boolean;
+}) {
+  const cardClass = compact
+    ? "bg-slate-800/60 rounded-xl p-4 border border-slate-700/50"
+    : "bg-slate-800/60 rounded-2xl p-6 border border-slate-700/50";
+  const headingClass = compact
+    ? "text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3"
+    : "text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4";
+
+  return (
+    <div className="space-y-4">
+      {/* Source preview with CSS filter adjustments */}
+      {imagePreview && !compact && (
+        <div className={cardClass}>
+          <h3 className={headingClass}>Source Image</h3>
+          <div className="aspect-square rounded-xl overflow-hidden bg-slate-900 shadow-inner">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={imagePreview}
+              alt="Source"
+              className="w-full h-full object-contain"
+              style={{
+                filter: `brightness(${100 + adjustments.brightness}%) contrast(${100 + adjustments.contrast}%) saturate(${100 + adjustments.saturation}%)`,
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Mosaic Size */}
+      <div className={cardClass}>
+        <h3 className={headingClass}>Mosaic Size</h3>
+        <select
+          value={MOSAIC_SIZES.indexOf(selectedSize)}
+          onChange={(e) => onSizeChange(MOSAIC_SIZES[Number(e.target.value)])}
+          className="w-full bg-slate-700 text-white rounded-xl px-4 py-2.5 border border-slate-600
+                     focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                     cursor-pointer appearance-none text-sm
+                     bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22/%3E%3C/svg%3E')]
+                     bg-[length:20px] bg-[right_12px_center] bg-no-repeat"
+        >
+          {MOSAIC_SIZES.map((size, i) => (
+            <option key={i} value={i}>
+              {size.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Piece Type */}
+      <div className={cardClass}>
+        <h3 className={headingClass}>Piece Type</h3>
+        <div className="grid grid-cols-2 gap-2">
+          {([
+            { id: "tile" as PieceType, label: "Tile", desc: "Smooth top", icon: "◻" },
+            { id: "plate" as PieceType, label: "Plate", desc: "Studded top", icon: "⊡" },
+          ]).map((type) => (
+            <button
+              key={type.id}
+              onClick={() => onPieceTypeChange(type.id)}
+              className={`
+                flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all duration-200
+                ${
+                  pieceType === type.id
+                    ? "border-blue-500 bg-blue-500/10 text-white"
+                    : "border-slate-600 bg-slate-700/30 text-slate-400 hover:border-slate-500 hover:text-slate-300"
+                }
+              `}
+            >
+              <span className="text-xl">{type.icon}</span>
+              <span className="font-semibold text-xs">{type.label}</span>
+              <span className="text-[10px] opacity-70">{type.desc}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Optimize Toggle */}
+      <div className={cardClass}>
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className={headingClass + " !mb-1"}>Minimize Pieces</h3>
+            <p className="text-xs text-slate-500">
+              Merge same-color areas into larger bricks
+            </p>
+          </div>
+          <button
+            onClick={() => onOptimizeChange(!optimize)}
+            className={`
+              relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0
+              ${optimize ? "bg-blue-600" : "bg-slate-600"}
+            `}
+          >
+            <span
+              className={`
+                absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200
+                ${optimize ? "translate-x-5" : "translate-x-0"}
+              `}
+            />
+          </button>
+        </div>
+      </div>
+
+      {/* Image Adjustments */}
+      <div className={cardClass}>
+        <h3 className={headingClass}>Image Adjustments</h3>
+        <div className="space-y-4">
+          <Slider
+            label="Brightness"
+            value={adjustments.brightness}
+            onChange={(v) => onAdjustmentsChange({ ...adjustments, brightness: v })}
+          />
+          <Slider
+            label="Contrast"
+            value={adjustments.contrast}
+            onChange={(v) => onAdjustmentsChange({ ...adjustments, contrast: v })}
+          />
+          <Slider
+            label="Saturation"
+            value={adjustments.saturation}
+            onChange={(v) => onAdjustmentsChange({ ...adjustments, saturation: v })}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function MosaicCreator() {
@@ -145,8 +291,9 @@ export default function MosaicCreator() {
   const [step, setStep] = useState(1);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [selectedSize, setSelectedSize] = useState<MosaicSize>(MOSAIC_SIZES[0]);
+  const [selectedSize, setSelectedSize] = useState<MosaicSize>(MOSAIC_SIZES[1]); // 32x32 default
   const [pieceType, setPieceType] = useState<PieceType>("tile");
+  const [optimize, setOptimize] = useState(false);
   const [adjustments, setAdjustments] = useState<ImageAdjustments>({
     brightness: 0,
     contrast: 0,
@@ -197,20 +344,21 @@ export default function MosaicCreator() {
     setIsGenerating(true);
     try {
       const mosaicResult = await generateMosaic(imageFile, selectedSize, {
-        pieceType: pieceType === 'tile' ? '3070b' : '3024',
+        pieceType: pieceType === "tile" ? "3070b" : "3024",
         brightness: adjustments.brightness,
         contrast: adjustments.contrast,
         saturation: adjustments.saturation,
+        optimize,
       });
       setResult(mosaicResult);
-      setStep(3);
+      setStep(2);
     } catch (err) {
       console.error("Mosaic generation failed:", err);
       alert("Failed to generate mosaic. Please try again.");
     } finally {
       setIsGenerating(false);
     }
-  }, [imageFile, selectedSize, pieceType, adjustments]);
+  }, [imageFile, selectedSize, pieceType, adjustments, optimize]);
 
   const handleDownloadLdr = useCallback(() => {
     if (!result) return;
@@ -243,15 +391,12 @@ export default function MosaicCreator() {
     setStep(1);
     setImageFile(null);
     setImagePreview(null);
-    setSelectedSize(MOSAIC_SIZES[0]);
-    setPieceType("tile");
-    setAdjustments({ brightness: 0, contrast: 0, saturation: 0 });
     setResult(null);
     setIsGenerating(false);
   }, []);
 
   const totalPieces = useMemo(
-    () => result?.partsList.reduce((sum, p) => sum + p.count, 0) ?? 0,
+    () => result?.totalPieces ?? 0,
     [result]
   );
 
@@ -290,6 +435,7 @@ export default function MosaicCreator() {
         {imagePreview ? (
           <div className="space-y-4">
             <div className="relative w-full max-w-sm mx-auto aspect-square rounded-lg overflow-hidden shadow-2xl">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={imagePreview}
                 alt="Uploaded preview"
@@ -333,335 +479,293 @@ export default function MosaicCreator() {
       </div>
 
       {imagePreview && (
-        <div className="mt-6 flex justify-center">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setStep(2);
-            }}
-            className="px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl
-                       shadow-lg shadow-blue-600/25 hover:shadow-blue-500/30
-                       transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
-          >
-            Continue to Configure →
-          </button>
+        <div className="mt-8 space-y-6">
+          {/* Settings inline on upload step */}
+          <SettingsPanel
+            selectedSize={selectedSize}
+            onSizeChange={setSelectedSize}
+            pieceType={pieceType}
+            onPieceTypeChange={setPieceType}
+            adjustments={adjustments}
+            onAdjustmentsChange={setAdjustments}
+            optimize={optimize}
+            onOptimizeChange={setOptimize}
+            imagePreview={imagePreview}
+          />
+
+          <div className="flex justify-center">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleGenerate();
+              }}
+              disabled={isGenerating}
+              className="px-8 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500
+                         text-white font-semibold rounded-xl shadow-lg shadow-blue-600/25
+                         hover:shadow-blue-500/30 disabled:shadow-none
+                         transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0
+                         disabled:translate-y-0 disabled:cursor-not-allowed
+                         flex items-center gap-2.5"
+            >
+              {isGenerating ? (
+                <>
+                  <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  Generating Mosaic…
+                </>
+              ) : (
+                <>Generate Mosaic →</>
+              )}
+            </button>
+          </div>
         </div>
       )}
     </div>
   );
 
-  // ─── Step 2: Configure ────────────────────────────────────────────────────
+  // ─── Step 2: Configure + Preview + Export ──────────────────────────────────
 
-  const renderConfigureStep = () => (
-    <div className="max-w-4xl mx-auto">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Preview Panel */}
-        <div className="bg-slate-800/60 rounded-2xl p-6 border border-slate-700/50">
-          <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
-            Source Image
-          </h3>
-          {imagePreview && (
-            <div className="aspect-square rounded-xl overflow-hidden bg-slate-900 shadow-inner">
-              <img
-                src={imagePreview}
-                alt="Source"
-                className="w-full h-full object-contain"
-                style={{
-                  filter: `brightness(${100 + adjustments.brightness}%) contrast(${100 + adjustments.contrast}%) saturate(${100 + adjustments.saturation}%)`,
-                }}
-              />
-            </div>
-          )}
-        </div>
+  const renderResultStep = () => (
+    <div className="max-w-6xl mx-auto">
+      <div className="grid grid-cols-1 xl:grid-cols-[320px_1fr] gap-6">
+        {/* Left sidebar: Settings */}
+        <div className="order-2 xl:order-1">
+          <div className="xl:sticky xl:top-20">
+            <SettingsPanel
+              selectedSize={selectedSize}
+              onSizeChange={setSelectedSize}
+              pieceType={pieceType}
+              onPieceTypeChange={setPieceType}
+              adjustments={adjustments}
+              onAdjustmentsChange={setAdjustments}
+              optimize={optimize}
+              onOptimizeChange={setOptimize}
+              imagePreview={imagePreview}
+              compact
+            />
 
-        {/* Settings Panel */}
-        <div className="space-y-5">
-          {/* Mosaic Size */}
-          <div className="bg-slate-800/60 rounded-2xl p-6 border border-slate-700/50">
-            <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
-              Mosaic Size
-            </h3>
-            <select
-              value={MOSAIC_SIZES.indexOf(selectedSize)}
-              onChange={(e) => setSelectedSize(MOSAIC_SIZES[Number(e.target.value)])}
-              className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600
-                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                         cursor-pointer appearance-none
-                         bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22/%3E%3C/svg%3E')]
-                         bg-[length:20px] bg-[right_12px_center] bg-no-repeat"
-            >
-              {MOSAIC_SIZES.map((size, i) => (
-                <option key={i} value={i}>
-                  {size.label} — {size.widthStuds}×{size.heightStuds} studs
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Piece Type */}
-          <div className="bg-slate-800/60 rounded-2xl p-6 border border-slate-700/50">
-            <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
-              Piece Type
-            </h3>
-            <div className="grid grid-cols-2 gap-3">
-              {(
-                [
-                  {
-                    id: "tile" as PieceType,
-                    label: "Tile",
-                    desc: "Smooth top",
-                    icon: "◻",
-                  },
-                  {
-                    id: "plate" as PieceType,
-                    label: "Plate",
-                    desc: "Studded top",
-                    icon: "⊡",
-                  },
-                ] as const
-              ).map((type) => (
-                <button
-                  key={type.id}
-                  onClick={() => setPieceType(type.id)}
-                  className={`
-                    flex flex-col items-center gap-1.5 p-4 rounded-xl border-2 transition-all duration-200
-                    ${
-                      pieceType === type.id
-                        ? "border-blue-500 bg-blue-500/10 text-white"
-                        : "border-slate-600 bg-slate-700/30 text-slate-400 hover:border-slate-500 hover:text-slate-300"
-                    }
-                  `}
-                >
-                  <span className="text-2xl">{type.icon}</span>
-                  <span className="font-semibold text-sm">{type.label}</span>
-                  <span className="text-xs opacity-70">{type.desc}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Adjustments */}
-          <div className="bg-slate-800/60 rounded-2xl p-6 border border-slate-700/50">
-            <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
-              Image Adjustments
-            </h3>
-            <div className="space-y-5">
-              <Slider
-                label="Brightness"
-                value={adjustments.brightness}
-                onChange={(v) => setAdjustments((a) => ({ ...a, brightness: v }))}
-              />
-              <Slider
-                label="Contrast"
-                value={adjustments.contrast}
-                onChange={(v) => setAdjustments((a) => ({ ...a, contrast: v }))}
-              />
-              <Slider
-                label="Saturation"
-                value={adjustments.saturation}
-                onChange={(v) => setAdjustments((a) => ({ ...a, saturation: v }))}
-              />
+            {/* Re-generate button */}
+            <div className="mt-4">
+              <button
+                onClick={handleGenerate}
+                disabled={isGenerating}
+                className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500
+                           text-white font-semibold rounded-xl shadow-lg shadow-blue-600/25
+                           hover:shadow-blue-500/30 disabled:shadow-none
+                           transition-all duration-200
+                           disabled:cursor-not-allowed
+                           flex items-center justify-center gap-2.5"
+              >
+                {isGenerating ? (
+                  <>
+                    <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                    Regenerating…
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Regenerate Mosaic
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Actions */}
-      <div className="mt-8 flex items-center justify-between">
-        <button
-          onClick={() => setStep(1)}
-          className="px-5 py-2.5 text-sm font-medium text-slate-400 hover:text-white
-                     bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700
-                     transition-all duration-200"
-        >
-          ← Back
-        </button>
-        <button
-          onClick={handleGenerate}
-          disabled={isGenerating}
-          className="px-8 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500
-                     text-white font-semibold rounded-xl shadow-lg shadow-blue-600/25
-                     hover:shadow-blue-500/30 disabled:shadow-none
-                     transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0
-                     disabled:translate-y-0 disabled:cursor-not-allowed
-                     flex items-center gap-2.5"
-        >
-          {isGenerating ? (
+        {/* Right: Preview + Results */}
+        <div className="order-1 xl:order-2 space-y-6">
+          {result ? (
             <>
-              <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
-              Generating Mosaic…
+              {/* Mosaic Preview */}
+              <div className="bg-slate-800/60 rounded-2xl p-6 border border-slate-700/50">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
+                    Mosaic Preview
+                  </h3>
+                  <span className="text-xs text-slate-500 font-mono">
+                    {selectedSize.widthStuds}×{selectedSize.heightStuds} studs
+                  </span>
+                </div>
+                <div className="flex justify-center bg-slate-900 rounded-xl p-4 shadow-inner overflow-auto">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={result.previewDataURL}
+                    alt="Mosaic preview"
+                    className="rounded-lg max-w-full max-h-[600px] object-contain"
+                    style={{ imageRendering: "pixelated" }}
+                  />
+                </div>
+              </div>
+
+              {/* Stats Row */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50 text-center">
+                  <p className="text-2xl font-bold text-white">{totalPieces.toLocaleString()}</p>
+                  <p className="text-xs text-slate-400 mt-1">Total Pieces</p>
+                </div>
+                <div className="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50 text-center">
+                  <p className="text-2xl font-bold text-white">{result.partsList.length}</p>
+                  <p className="text-xs text-slate-400 mt-1">Unique Parts</p>
+                </div>
+                <div className="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50 text-center">
+                  <p className="text-2xl font-bold text-white capitalize">{pieceType}</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {pieceType === "tile" ? "Smooth Top" : "Studded Top"}
+                  </p>
+                </div>
+                {result.optimized ? (
+                  <div className="bg-emerald-900/30 rounded-xl p-4 border border-emerald-700/30 text-center">
+                    <p className="text-2xl font-bold text-emerald-400">
+                      -{result.optimized.reductionPercent}%
+                    </p>
+                    <p className="text-xs text-emerald-500/80 mt-1">
+                      Pieces Saved
+                    </p>
+                  </div>
+                ) : (
+                  <div className="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50 text-center">
+                    <p className="text-2xl font-bold text-white">{selectedSize.baseplates}</p>
+                    <p className="text-xs text-slate-400 mt-1">Baseplates</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Parts List Table */}
+              <div className="bg-slate-800/60 rounded-2xl border border-slate-700/50 overflow-hidden">
+                <div className="p-5 border-b border-slate-700/50">
+                  <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
+                    Parts List
+                  </h3>
+                </div>
+                <div className="max-h-80 overflow-y-auto">
+                  <table className="w-full">
+                    <thead className="sticky top-0 bg-slate-800">
+                      <tr className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                        <th className="text-left py-3 px-5">Color</th>
+                        <th className="text-left py-3 px-5">Name</th>
+                        <th className="text-left py-3 px-5">Part</th>
+                        <th className="text-right py-3 px-5">Count</th>
+                        <th className="text-right py-3 px-5">BL Color ID</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-700/30">
+                      {result.partsList.map((part, i) => (
+                        <tr
+                          key={i}
+                          className="hover:bg-slate-700/20 transition-colors"
+                        >
+                          <td className="py-2.5 px-5">
+                            <div
+                              className="w-5 h-5 rounded shadow-sm border border-white/10"
+                              style={{ backgroundColor: part.color.hex }}
+                            />
+                          </td>
+                          <td className="py-2.5 px-5 text-sm text-gray-300">
+                            {part.color.name}
+                          </td>
+                          <td className="py-2.5 px-5 text-sm text-slate-400 font-mono">
+                            {part.partNumber}
+                          </td>
+                          <td className="py-2.5 px-5 text-sm text-white font-semibold text-right tabular-nums">
+                            {part.count.toLocaleString()}
+                          </td>
+                          <td className="py-2.5 px-5 text-sm text-slate-400 text-right font-mono">
+                            {part.bricklinkColorId}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Export Options */}
+              <div className="bg-slate-800/60 rounded-2xl p-5 border border-slate-700/50">
+                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
+                  Export Options
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-4">
+                  <div className="flex items-start gap-2.5">
+                    <span className="mt-0.5 text-emerald-400">▸</span>
+                    <p className="text-slate-300">
+                      <span className="font-semibold text-white">.ldr file:</span>{" "}
+                      Open in BrickLink Studio to view, edit, and render your mosaic
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <span className="mt-0.5 text-amber-400">▸</span>
+                    <p className="text-slate-300">
+                      <span className="font-semibold text-white">Wanted List XML:</span>{" "}
+                      Upload directly to BrickLink.com to order all parts
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={handleDownloadLdr}
+                    className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl
+                               shadow-lg shadow-emerald-600/25 hover:shadow-emerald-500/30
+                               transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0
+                               flex items-center gap-2 text-sm"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Download .ldr File
+                  </button>
+                  <button
+                    onClick={handleDownloadWantedList}
+                    className="px-6 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl
+                               shadow-lg shadow-amber-600/25 hover:shadow-amber-500/30
+                               transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0
+                               flex items-center gap-2 text-sm"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Export BrickLink Wanted List
+                  </button>
+                </div>
+              </div>
+
+              {/* Start Over */}
+              <div className="flex justify-start">
+                <button
+                  onClick={handleStartOver}
+                  className="px-5 py-2.5 text-sm font-medium text-slate-400 hover:text-white
+                             bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700
+                             transition-all duration-200"
+                >
+                  ← Upload New Image
+                </button>
+              </div>
             </>
           ) : (
-            <>Generate Mosaic →</>
+            /* Placeholder when no result yet */
+            <div className="bg-slate-800/60 rounded-2xl p-12 border border-slate-700/50 text-center">
+              <p className="text-slate-500">
+                Configure your settings and click &quot;Generate Mosaic&quot; to see the preview.
+              </p>
+            </div>
           )}
-        </button>
-      </div>
-    </div>
-  );
-
-  // ─── Step 3: Preview & Export ─────────────────────────────────────────────
-
-  const renderPreviewStep = () => (
-    <div className="max-w-5xl mx-auto">
-      {result && (
-        <div className="space-y-8">
-          {/* Mosaic Preview */}
-          <div className="bg-slate-800/60 rounded-2xl p-6 border border-slate-700/50">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
-                Mosaic Preview
-              </h3>
-              <span className="text-xs text-slate-500 font-mono">
-                {selectedSize.widthStuds}×{selectedSize.heightStuds} studs
-              </span>
-            </div>
-            <div className="flex justify-center bg-slate-900 rounded-xl p-4 shadow-inner overflow-auto">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={result.previewDataURL}
-                alt="Mosaic preview"
-                className="rounded-lg max-w-full max-h-[600px] object-contain image-rendering-pixelated"
-              />
-            </div>
-          </div>
-
-          {/* Stats + Parts List */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Stats Cards */}
-            <div className="space-y-4">
-              <div className="bg-slate-800/60 rounded-2xl p-6 border border-slate-700/50 text-center">
-                <p className="text-3xl font-bold text-white">{totalPieces.toLocaleString()}</p>
-                <p className="text-sm text-slate-400 mt-1">Total Pieces</p>
-              </div>
-              <div className="bg-slate-800/60 rounded-2xl p-6 border border-slate-700/50 text-center">
-                <p className="text-3xl font-bold text-white">{result.partsList.length}</p>
-                <p className="text-sm text-slate-400 mt-1">Unique Colors</p>
-              </div>
-              <div className="bg-slate-800/60 rounded-2xl p-6 border border-slate-700/50 text-center">
-                <p className="text-lg font-bold text-white capitalize">{pieceType}</p>
-                <p className="text-sm text-slate-400 mt-1">
-                  {pieceType === "tile" ? "1×1 Smooth Tiles" : "1×1 Studded Plates"}
-                </p>
-              </div>
-            </div>
-
-            {/* Parts List Table */}
-            <div className="lg:col-span-2 bg-slate-800/60 rounded-2xl border border-slate-700/50 overflow-hidden">
-              <div className="p-5 border-b border-slate-700/50">
-                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
-                  Parts List
-                </h3>
-              </div>
-              <div className="max-h-80 overflow-y-auto">
-                <table className="w-full">
-                  <thead className="sticky top-0 bg-slate-800">
-                    <tr className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                      <th className="text-left py-3 px-5">Color</th>
-                      <th className="text-left py-3 px-5">Name</th>
-                      <th className="text-right py-3 px-5">Count</th>
-                      <th className="text-right py-3 px-5">BL Color ID</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-700/30">
-                    {result.partsList.map((part, i) => (
-                      <tr
-                        key={i}
-                        className="hover:bg-slate-700/20 transition-colors"
-                      >
-                        <td className="py-3 px-5">
-                          <div
-                            className="w-6 h-6 rounded-md shadow-sm border border-white/10"
-                            style={{
-                              backgroundColor: part.color.hex,
-                            }}
-                          />
-                        </td>
-                        <td className="py-3 px-5 text-sm text-gray-300">
-                          {part.color.name}
-                        </td>
-                        <td className="py-3 px-5 text-sm text-white font-semibold text-right tabular-nums">
-                          {part.count.toLocaleString()}
-                        </td>
-                        <td className="py-3 px-5 text-sm text-slate-400 text-right font-mono">
-                          {part.bricklinkColorId}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          {/* Export Workflow Descriptions */}
-          <div className="bg-slate-800/60 rounded-2xl p-5 border border-slate-700/50">
-            <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
-              Export Options
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-              <div className="flex items-start gap-2.5">
-                <span className="mt-0.5 text-emerald-400">▸</span>
-                <p className="text-slate-300">
-                  <span className="font-semibold text-white">.ldr file:</span>{" "}
-                  Open in BrickLink Studio to view, edit, and render your mosaic
-                </p>
-              </div>
-              <div className="flex items-start gap-2.5">
-                <span className="mt-0.5 text-amber-400">▸</span>
-                <p className="text-slate-300">
-                  <span className="font-semibold text-white">Wanted List XML:</span>{" "}
-                  Upload directly to BrickLink.com to order all parts
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
-            <button
-              onClick={handleStartOver}
-              className="px-5 py-2.5 text-sm font-medium text-slate-400 hover:text-white
-                         bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700
-                         transition-all duration-200"
-            >
-              ← Start Over
-            </button>
-            <div className="flex flex-wrap items-center justify-end gap-3">
-              <button
-                onClick={handleDownloadLdr}
-                className="px-8 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl
-                           shadow-lg shadow-emerald-600/25 hover:shadow-emerald-500/30
-                           transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0
-                           flex items-center gap-2.5"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                Download .ldr File
-              </button>
-              <button
-                onClick={handleDownloadWantedList}
-                className="px-8 py-3 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl
-                           shadow-lg shadow-amber-600/25 hover:shadow-amber-500/30
-                           transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0
-                           flex items-center gap-2.5"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                Export BrickLink Wanted List
-              </button>
-            </div>
-          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 
@@ -673,8 +777,7 @@ export default function MosaicCreator() {
 
       <div className="transition-all duration-300">
         {step === 1 && renderUploadStep()}
-        {step === 2 && renderConfigureStep()}
-        {step === 3 && renderPreviewStep()}
+        {step === 2 && renderResultStep()}
       </div>
     </div>
   );

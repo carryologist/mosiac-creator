@@ -13,12 +13,14 @@
 
 import type { LegoColor, RGB } from './colors';
 import { findNearestColor, byLdrawCode } from './colors';
-import { generateLDR, createMosaicConfig } from './ldraw';
+import { generateLDR, generateOptimizedLDR, createMosaicConfig } from './ldraw';
 import type { MosaicConfig } from './ldraw';
 import { processImage, generatePreviewDataURL } from './imageProcessor';
+import { optimizePieces } from './pieceOptimizer';
+import type { OptimizedMosaic, PlacedPiece } from './pieceOptimizer';
 
-// Re-export MosaicConfig so consumers don't need a separate ldraw import.
-export type { MosaicConfig };
+// Re-export types so consumers don't need separate imports.
+export type { MosaicConfig, OptimizedMosaic, PlacedPiece };
 
 // =============================================================================
 // Types
@@ -60,10 +62,12 @@ export interface MosaicResult {
   ldrContent: string;
   /** Colour-sorted parts list (descending by count). */
   partsList: PartsListEntry[];
-  /** Total number of 1×1 pieces across all colours. */
+  /** Total number of pieces across all colours. */
   totalPieces: number;
   /** The LDraw mosaic configuration that was used. */
   config: MosaicConfig;
+  /** Optimization result (only present when optimize=true) */
+  optimized: OptimizedMosaic | null;
 }
 
 // =============================================================================
@@ -167,6 +171,48 @@ function buildPartsList(
   return entries;
 }
 
+/**
+ * Build a sorted parts list from optimized (mixed-size) pieces.
+ *
+ * Groups pieces by (partNumber, ldrawColor), counts each group, resolves
+ * colors via `byLdrawCode`, and returns entries sorted by descending count
+ * then alphabetically by name.
+ */
+function buildOptimizedPartsList(pieces: PlacedPiece[]): PartsListEntry[] {
+  // Key: "partNumber|ldrawColor" → count
+  const counts = new Map<string, number>();
+
+  for (const piece of pieces) {
+    // Strip the ".dat" suffix so the parts list uses bare part numbers.
+    const barePartNumber = piece.partNumber.replace(/\.dat$/i, '');
+    const key = `${barePartNumber}|${piece.ldrawColor}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  const entries: PartsListEntry[] = [];
+
+  for (const [key, count] of counts) {
+    const [partNumber, ldrawCodeStr] = key.split('|');
+    const ldrawCode = Number(ldrawCodeStr);
+    const legoColor = byLdrawCode.get(ldrawCode);
+    if (!legoColor) {
+      throw new Error(`Unknown LDraw colour code in optimized pieces: ${ldrawCode}`);
+    }
+
+    entries.push({
+      color: legoColor,
+      count,
+      bricklinkColorId: legoColor.bricklinkId,
+      partNumber,
+    });
+  }
+
+  // Most-used first; ties broken alphabetically by colour name.
+  entries.sort((a, b) => b.count - a.count || a.color.name.localeCompare(b.color.name));
+
+  return entries;
+}
+
 // =============================================================================
 // Main Pipeline
 // =============================================================================
@@ -195,10 +241,13 @@ export async function generateMosaic(
     brightness?: number;
     contrast?: number;
     saturation?: number;
+    /** When true, merge same-color regions into larger standard plates/tiles */
+    optimize?: boolean;
   },
 ): Promise<MosaicResult> {
   const { widthStuds, heightStuds } = size;
   const pieceType = options?.pieceType ?? '3070b';
+  const optimize = options?.optimize ?? false;
 
   // ── Step 1: Process the source image ─────────────────────────────────────
   const pixelData = await processImage(file, widthStuds, heightStuds, {
@@ -232,12 +281,29 @@ export async function generateMosaic(
 
   // ── Step 4: Generate the LDR file ────────────────────────────────────────
   const config = createMosaicConfig(widthStuds, heightStuds, pieceTypeToDat(pieceType));
-  const ldrContent = generateLDR(config, ldrawColorGrid);
 
-  // ── Step 5: Build the parts list ─────────────────────────────────────────
-  const partNumber = datToPartNumber(pieceTypeToDat(pieceType));
-  const partsList = buildPartsList(ldrawColorGrid, partNumber);
-  const totalPieces = widthStuds * heightStuds;
+  let ldrContent: string;
+  let partsList: PartsListEntry[];
+  let totalPieces: number;
+  let optimized: OptimizedMosaic | null = null;
+
+  if (optimize) {
+    // Run piece optimization: merge same-color regions into larger pieces.
+    const optimizedResult = optimizePieces(
+      ldrawColorGrid,
+      pieceType === '3070b' ? 'tile' : 'plate',
+    );
+    optimized = optimizedResult;
+    ldrContent = generateOptimizedLDR(config, optimizedResult.pieces);
+    partsList = buildOptimizedPartsList(optimizedResult.pieces);
+    totalPieces = optimizedResult.totalPieces;
+  } else {
+    // Non-optimized path: all 1×1 pieces.
+    ldrContent = generateLDR(config, ldrawColorGrid);
+    const partNumber = datToPartNumber(pieceTypeToDat(pieceType));
+    partsList = buildPartsList(ldrawColorGrid, partNumber);
+    totalPieces = widthStuds * heightStuds;
+  }
 
   return {
     colorGrid,
@@ -247,6 +313,7 @@ export async function generateMosaic(
     partsList,
     totalPieces,
     config,
+    optimized,
   };
 }
 

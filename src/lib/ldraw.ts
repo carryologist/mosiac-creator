@@ -22,6 +22,9 @@ const LDU_PER_PLATE_HEIGHT = 8;
 /** Identity rotation matrix for LDraw part references */
 const IDENTITY_MATRIX = '1 0 0 0 1 0 0 0 1';
 
+/** 90-degree Y-axis rotation matrix for rotated pieces */
+const ROTATED_90_Y_MATRIX = '0 0 -1 0 1 0 1 0 0';
+
 /** Color code indicating an empty cell (no piece placed) */
 const EMPTY_CELL = -1;
 
@@ -213,6 +216,22 @@ function partLine(
   return `1 ${color} ${x} ${y} ${z} ${IDENTITY_MATRIX} ${part}`;
 }
 
+/**
+ * Build an LDraw part reference line (type 1) with a custom rotation matrix.
+ *
+ * Format: 1 <color> <x> <y> <z> <rotation matrix> <part>
+ */
+export function partLineWithMatrix(
+  color: number,
+  x: number,
+  y: number,
+  z: number,
+  rotationMatrix: string,
+  part: string,
+): string {
+  return `1 ${color} ${x} ${y} ${z} ${rotationMatrix} ${part}`;
+}
+
 // ============================================================================
 // LDR File Generation
 // ============================================================================
@@ -346,4 +365,95 @@ export function createMosaicConfig(
     pieceType,
     baseplateLayout: calculateBaseplateLayout(widthStuds, heightStuds, baseplateColor),
   };
+}
+
+// ============================================================================
+// Optimized LDR Generation (Multi-Size Pieces)
+// ============================================================================
+
+import type { PlacedPiece } from './pieceOptimizer';
+
+/**
+ * Generate an LDR file from optimized piece placements (mixed sizes).
+ * Each PlacedPiece has row, col, width, height, ldrawColor, partNumber (.dat),
+ * and rotated flag.
+ *
+ * When rotated is false, use identity matrix: 1 0 0 0 1 0 0 0 1
+ * When rotated is true, use 90-degree Y rotation: 0 0 -1 0 1 0 1 0 0
+ *
+ * @param config - Mosaic configuration (dimensions, piece type, baseplate layout)
+ * @param pieces - Array of optimized placed pieces with position, size, color,
+ *                 part number, and rotation info
+ * @returns The full .ldr file content as a string
+ */
+export function generateOptimizedLDR(
+  config: MosaicConfig,
+  pieces: PlacedPiece[],
+): string {
+  const lines: string[] = [];
+  const { baseplateLayout, pieceType, widthStuds, heightStuds } = config;
+  const { baseplate } = baseplateLayout;
+  const bpStuds = baseplate.sizeStuds;
+
+  // -- Header ----------------------------------------------------------------
+  lines.push(commentLine('FILE mosaic.ldr'));
+  lines.push(commentLine('mosaic'));
+  lines.push(commentLine('Name: mosaic.ldr'));
+  lines.push(commentLine('Author: Mosaic Creator'));
+  lines.push(commentLine('!LDRAW_ORG Unofficial_Model'));
+  lines.push(commentLine(`!LICENSE Redistributable under CCAL version 2.0 : see CAreadme.txt`));
+  lines.push(commentLine(''));
+  lines.push(commentLine(`Mosaic size: ${widthStuds} x ${heightStuds} studs`));
+  lines.push(commentLine(
+    `Baseplates: ${baseplateLayout.cols} x ${baseplateLayout.rows}` +
+    ` of ${bpStuds}x${bpStuds} (${baseplate.partNumber})`,
+  ));
+  lines.push(commentLine(`Piece type: ${pieceType}`));
+  lines.push(commentLine(''));
+
+  // -- Layer 1: Baseplates at y = 0 ------------------------------------------
+  lines.push(commentLine('Baseplates'));
+  for (let bpRow = 0; bpRow < baseplateLayout.rows; bpRow++) {
+    for (let bpCol = 0; bpCol < baseplateLayout.cols; bpCol++) {
+      const x = baseplateCenter(bpCol, bpStuds);
+      const z = baseplateCenter(bpRow, bpStuds);
+      lines.push(partLine(baseplate.color, x, 0, z, baseplate.partNumber));
+    }
+  }
+  lines.push(commentLine('STEP'));
+  lines.push(commentLine(''));
+
+  // -- Layer 2: Optimized tiles / plates at y = -8 ---------------------------
+  lines.push(commentLine('Tiles'));
+  const tileY = -LDU_PER_PLATE_HEIGHT;
+
+  for (const piece of pieces) {
+    // Compute center X from leftmost and rightmost stud positions
+    const xLeft = tileWorldCoord(piece.col, bpStuds);
+    const xRight = tileWorldCoord(piece.col + piece.width - 1, bpStuds);
+    const centerX = (xLeft + xRight) / 2;
+
+    // Compute center Z from topmost and bottommost stud positions
+    const zTop = tileWorldCoord(piece.row, bpStuds);
+    const zBottom = tileWorldCoord(piece.row + piece.height - 1, bpStuds);
+    const centerZ = (zTop + zBottom) / 2;
+
+    // Select rotation matrix based on the rotated flag
+    const matrix = piece.rotated ? ROTATED_90_Y_MATRIX : IDENTITY_MATRIX;
+
+    lines.push(partLineWithMatrix(
+      piece.ldrawColor,
+      centerX,
+      tileY,
+      centerZ,
+      matrix,
+      piece.partNumber,
+    ));
+  }
+  lines.push(commentLine('STEP'));
+
+  // Trailing newline for POSIX compliance
+  lines.push('');
+
+  return lines.join('\n');
 }
