@@ -124,56 +124,68 @@ export default function LDrawViewer({ ldrContent, height = 500 }: LDrawViewerPro
     const loader = new LDrawLoader();
     loader.setPartsLibraryPath(LDRAW_LIBRARY_URL);
 
-    // Preload LDraw color definitions, then parse the model.
-    // parse() doesn't call addDefaultMaterials() internally (load() does),
-    // so without this step all materials resolve to null -> "uuid" crash.
-    loader.preloadMaterials(LDRAW_LIBRARY_URL + "LDConfig.ldr")
-      .then(() => {
-        if (cancelled) return;
-        loader.parse(
-          ldrContent,
-          (group: THREE.Group) => {
-            if (cancelled) return;
+    // Load color definitions then parse the model.
+    // We fetch LDConfig.ldr ourselves because preloadMaterials() uses
+    // Three.js FileLoader internally which can fail on certain deployments
+    // (path resolution / MIME type issues). A Blob URL always works.
+    (async () => {
+      try {
+        const resp = await fetch(LDRAW_LIBRARY_URL + "LDConfig.ldr");
+        if (!resp.ok) throw new Error(`LDConfig.ldr: HTTP ${resp.status}`);
+        const configText = await resp.text();
+        const blob = new Blob([configText], { type: "text/plain" });
+        const blobUrl = URL.createObjectURL(blob);
+        try {
+          await loader.preloadMaterials(blobUrl);
+        } finally {
+          URL.revokeObjectURL(blobUrl);
+        }
+      } catch (e) {
+        // If preload fails, fall back to default materials (limited colors)
+        console.warn("LDConfig.ldr preload failed, using defaults:", e);
+        loader.addDefaultMaterials();
+      }
 
-            // Merge geometries for performance
-            const mergedGroup = LDrawUtils.mergeObject(group);
-            // LDraw Y-axis is inverted relative to Three.js convention
-            mergedGroup.rotateX(-Math.PI);
+      if (cancelled) return;
 
-            // Center the model and fit camera
-            const box = new THREE.Box3().setFromObject(mergedGroup);
-            const center = box.getCenter(new THREE.Vector3());
-            const size = box.getSize(new THREE.Vector3());
+      loader.parse(
+        ldrContent,
+        (group: THREE.Group) => {
+          if (cancelled) return;
 
-            mergedGroup.position.sub(center);
-            scene.add(mergedGroup);
-            modelRef.current = mergedGroup;
+          // Merge geometries for performance
+          const mergedGroup = LDrawUtils.mergeObject(group);
+          // LDraw Y-axis is inverted relative to Three.js convention
+          mergedGroup.rotateX(-Math.PI);
 
-            // Position camera to frame the model
-            const maxDim = Math.max(size.x, size.y, size.z);
-            const fov = camera.fov * (Math.PI / 180);
-            const dist = maxDim / (2 * Math.tan(fov / 2)) * 1.5;
-            camera.position.set(dist * 0.8, dist * 0.6, dist * 0.8);
-            camera.lookAt(0, 0, 0);
-            controls.target.set(0, 0, 0);
-            controls.update();
+          // Center the model and fit camera
+          const box = new THREE.Box3().setFromObject(mergedGroup);
+          const center = box.getCenter(new THREE.Vector3());
+          const size = box.getSize(new THREE.Vector3());
 
-            setLoading(false);
-          },
-          (err: unknown) => {
-            if (cancelled) return;
-            console.error("LDraw parse error:", err);
-            setError(err instanceof Error ? err.message : "Failed to parse LDR model");
-            setLoading(false);
-          }
-        );
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        console.error("LDraw material preload error:", err);
-        setError("Failed to load LDraw color definitions");
-        setLoading(false);
-      });
+          mergedGroup.position.sub(center);
+          scene.add(mergedGroup);
+          modelRef.current = mergedGroup;
+
+          // Position camera to frame the model
+          const maxDim = Math.max(size.x, size.y, size.z);
+          const fov = camera.fov * (Math.PI / 180);
+          const dist = maxDim / (2 * Math.tan(fov / 2)) * 1.5;
+          camera.position.set(dist * 0.8, dist * 0.6, dist * 0.8);
+          camera.lookAt(0, 0, 0);
+          controls.target.set(0, 0, 0);
+          controls.update();
+
+          setLoading(false);
+        },
+        (err: unknown) => {
+          if (cancelled) return;
+          console.error("LDraw parse error:", err);
+          setError(err instanceof Error ? err.message : "Failed to parse LDR model");
+          setLoading(false);
+        }
+      );
+    })();
 
     return () => { cancelled = true; };
   }, [ldrContent]);

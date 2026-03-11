@@ -21,7 +21,7 @@ const nextConfig: NextConfig = {
             "style-src 'self' 'unsafe-inline'",
             "img-src 'self' blob: data:",
             "font-src 'self'",
-            "connect-src 'self'",
+            "connect-src 'self' blob:",
             "frame-ancestors 'none'",
           ].join("; "),
         },
