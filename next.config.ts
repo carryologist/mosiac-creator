@@ -21,7 +21,7 @@ const nextConfig: NextConfig = {
             "style-src 'self' 'unsafe-inline'",
             "img-src 'self' blob: data:",
             "font-src 'self'",
-            "connect-src 'self'",
+            "connect-src 'self' https://library.ldraw.org",
             "frame-ancestors 'none'",
           ].join("; "),
         },

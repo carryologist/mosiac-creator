@@ -8,6 +8,16 @@ import {
   MosaicResult,
   MosaicSize,
 } from "@/lib/mosaicEngine";
+import dynamic from "next/dynamic";
+
+const LDrawViewer = dynamic(() => import("./LDrawViewer"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-[500px] bg-slate-800/60 rounded-xl border border-slate-700/50">
+      <p className="text-sm text-slate-400">Loading 3D viewer...</p>
+    </div>
+  ),
+});
 
 type PieceType = "tile" | "plate";
 
@@ -688,6 +698,19 @@ export default function MosaicCreator() {
                     style={{ imageRendering: "pixelated" }}
                   />
                 </div>
+              </div>
+
+              {/* 3D LDraw Preview */}
+              <div className="bg-slate-800/60 rounded-2xl p-6 border border-slate-700/50">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
+                    3D Preview
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Click and drag to rotate · Scroll to zoom
+                  </p>
+                </div>
+                <LDrawViewer ldrContent={result.ldrContent} height={500} />
               </div>
 
               {/* Stats Row */}
