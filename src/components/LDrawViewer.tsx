@@ -6,7 +6,7 @@ import { LDrawLoader } from "three/addons/loaders/LDrawLoader.js";
 import { LDrawUtils } from "three/addons/utils/LDrawUtils.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-const LDRAW_LIBRARY_URL = "https://library.ldraw.org/library/official/";
+const LDRAW_LIBRARY_URL = "/ldraw/";
 
 interface LDrawViewerProps {
   ldrContent: string;
@@ -166,7 +166,7 @@ export default function LDrawViewer({ ldrContent, height = 500 }: LDrawViewerPro
           <div className="text-center">
             <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
             <p className="text-sm text-slate-400">Loading 3D preview...</p>
-            <p className="text-xs text-slate-500 mt-1">Fetching parts from LDraw library</p>
+            <p className="text-xs text-slate-500 mt-1">Parsing LDraw model</p>
           </div>
         </div>
       )}
