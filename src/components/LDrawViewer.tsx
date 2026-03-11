@@ -121,70 +121,97 @@ export default function LDrawViewer({ ldrContent, height = 500 }: LDrawViewerPro
 
     let cancelled = false;
 
-    const loader = new LDrawLoader();
-    loader.setPartsLibraryPath(LDRAW_LIBRARY_URL);
-
-    // Load color definitions then parse the model.
-    // We fetch LDConfig.ldr ourselves because preloadMaterials() uses
-    // Three.js FileLoader internally which can fail on certain deployments
-    // (path resolution / MIME type issues). A Blob URL always works.
+    // Build a fully self-contained packed MPD so the parser never needs
+    // to fetch sub-part files (Three.js FileLoader fails on some hosts).
+    // We fetch LDConfig.ldr (color defs) + library.mpd (all parts packed)
+    // ourselves, combine with the mosaic LDR, and parse in one shot.
     (async () => {
       try {
-        const resp = await fetch(LDRAW_LIBRARY_URL + "LDConfig.ldr");
-        if (!resp.ok) throw new Error(`LDConfig.ldr: HTTP ${resp.status}`);
-        const configText = await resp.text();
-        const blob = new Blob([configText], { type: "text/plain" });
-        const blobUrl = URL.createObjectURL(blob);
+        const [configResp, libResp] = await Promise.all([
+          fetch(LDRAW_LIBRARY_URL + "LDConfig.ldr"),
+          fetch(LDRAW_LIBRARY_URL + "library.mpd"),
+        ]);
+        if (!configResp.ok) throw new Error(`LDConfig.ldr: HTTP ${configResp.status}`);
+        if (!libResp.ok) throw new Error(`library.mpd: HTTP ${libResp.status}`);
+
+        const [configText, libText] = await Promise.all([
+          configResp.text(),
+          libResp.text(),
+        ]);
+
+        if (cancelled) return;
+
+        // Feed color definitions to the loader via Blob URL
+        const loader = new LDrawLoader();
+        const configBlob = new Blob([configText], { type: "text/plain" });
+        const configBlobUrl = URL.createObjectURL(configBlob);
         try {
-          await loader.preloadMaterials(blobUrl);
+          await loader.preloadMaterials(configBlobUrl);
         } finally {
-          URL.revokeObjectURL(blobUrl);
+          URL.revokeObjectURL(configBlobUrl);
         }
-      } catch (e) {
-        // If preload fails, fall back to default materials (limited colors)
-        console.warn("LDConfig.ldr preload failed, using defaults:", e);
-        loader.addDefaultMaterials();
+
+        if (cancelled) return;
+
+        // Build packed MPD: our mosaic as the main model + all library parts
+        const packedMpd = [
+          "0 FILE main.ldr",
+          ldrContent,
+          "0 NOFILE",
+          "",
+          libText,
+        ].join("\n");
+
+        // Parse via Blob URL so the loader sees an MPD file (not raw text)
+        const mpdBlob = new Blob([packedMpd], { type: "text/plain" });
+        const mpdBlobUrl = URL.createObjectURL(mpdBlob);
+
+        loader.load(
+          mpdBlobUrl,
+          (group: THREE.Group) => {
+            URL.revokeObjectURL(mpdBlobUrl);
+            if (cancelled) return;
+
+            // Merge geometries for performance
+            const mergedGroup = LDrawUtils.mergeObject(group);
+            // LDraw Y-axis is inverted relative to Three.js convention
+            mergedGroup.rotateX(-Math.PI);
+
+            // Center the model and fit camera
+            const box = new THREE.Box3().setFromObject(mergedGroup);
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+
+            mergedGroup.position.sub(center);
+            scene.add(mergedGroup);
+            modelRef.current = mergedGroup;
+
+            // Position camera to frame the model
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const fov = camera.fov * (Math.PI / 180);
+            const dist = maxDim / (2 * Math.tan(fov / 2)) * 1.5;
+            camera.position.set(dist * 0.8, dist * 0.6, dist * 0.8);
+            camera.lookAt(0, 0, 0);
+            controls.target.set(0, 0, 0);
+            controls.update();
+
+            setLoading(false);
+          },
+          undefined,
+          (err: unknown) => {
+            URL.revokeObjectURL(mpdBlobUrl);
+            if (cancelled) return;
+            console.error("LDraw parse error:", err);
+            setError(err instanceof Error ? err.message : "Failed to parse LDR model");
+            setLoading(false);
+          }
+        );
+      } catch (err) {
+        if (cancelled) return;
+        console.error("LDraw viewer init error:", err);
+        setError(err instanceof Error ? err.message : "Failed to initialize 3D viewer");
+        setLoading(false);
       }
-
-      if (cancelled) return;
-
-      loader.parse(
-        ldrContent,
-        (group: THREE.Group) => {
-          if (cancelled) return;
-
-          // Merge geometries for performance
-          const mergedGroup = LDrawUtils.mergeObject(group);
-          // LDraw Y-axis is inverted relative to Three.js convention
-          mergedGroup.rotateX(-Math.PI);
-
-          // Center the model and fit camera
-          const box = new THREE.Box3().setFromObject(mergedGroup);
-          const center = box.getCenter(new THREE.Vector3());
-          const size = box.getSize(new THREE.Vector3());
-
-          mergedGroup.position.sub(center);
-          scene.add(mergedGroup);
-          modelRef.current = mergedGroup;
-
-          // Position camera to frame the model
-          const maxDim = Math.max(size.x, size.y, size.z);
-          const fov = camera.fov * (Math.PI / 180);
-          const dist = maxDim / (2 * Math.tan(fov / 2)) * 1.5;
-          camera.position.set(dist * 0.8, dist * 0.6, dist * 0.8);
-          camera.lookAt(0, 0, 0);
-          controls.target.set(0, 0, 0);
-          controls.update();
-
-          setLoading(false);
-        },
-        (err: unknown) => {
-          if (cancelled) return;
-          console.error("LDraw parse error:", err);
-          setError(err instanceof Error ? err.message : "Failed to parse LDR model");
-          setLoading(false);
-        }
-      );
     })();
 
     return () => { cancelled = true; };
