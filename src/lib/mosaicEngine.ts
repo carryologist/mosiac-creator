@@ -122,9 +122,28 @@ function pieceTypeToDat(piece: '3070b' | '3024'): string {
   return `${piece}.dat`;
 }
 
-/** Strip the ".dat" extension to get a bare BrickLink part number. */
+/** Strip the ".dat" extension to get a bare LDraw part number. */
 function datToPartNumber(dat: string): string {
   return dat.replace(/\.dat$/i, '');
+}
+
+/**
+ * Map from LDraw part number (without .dat) to BrickLink catalog ID.
+ * LDraw uses revision suffixes like 'b' (e.g. '3070b' = Tile 1x1 with Groove).
+ * BrickLink's Wanted List XML upload requires the base part number without
+ * the revision suffix for these parts.
+ */
+const LDRAW_TO_BRICKLINK_PART: ReadonlyMap<string, string> = new Map([
+  // Tiles with 'b' revision in LDraw -> base number for BrickLink
+  ['3070b', '3070'],
+  ['3069b', '3069'],
+  ['3068b', '3068'],
+  // All other parts use the same ID in both systems
+]);
+
+/** Get the BrickLink part number for a given LDraw part number. */
+function toBricklinkPartNumber(ldrawPart: string): string {
+  return LDRAW_TO_BRICKLINK_PART.get(ldrawPart) ?? ldrawPart;
 }
 
 /**
@@ -135,8 +154,10 @@ function datToPartNumber(dat: string): string {
  */
 function buildPartsList(
   ldrawColorGrid: number[][],
-  partNumber: string,
+  ldrawPartNumber: string,
 ): PartsListEntry[] {
+  const bricklinkPart = toBricklinkPartNumber(ldrawPartNumber);
+
   // Accumulate counts keyed by LDraw code.
   const counts = new Map<number, number>();
 
@@ -152,8 +173,6 @@ function buildPartsList(
   for (const [code, count] of counts) {
     const legoColor = byLdrawCode.get(code);
     if (!legoColor) {
-      // Should never happen if findNearestColor is the only source, but
-      // guard defensively.
       throw new Error(`Unknown LDraw colour code in grid: ${code}`);
     }
 
@@ -161,7 +180,7 @@ function buildPartsList(
       color: legoColor,
       count,
       bricklinkColorId: legoColor.bricklinkId,
-      partNumber,
+      partNumber: bricklinkPart,
     });
   }
 
@@ -179,13 +198,12 @@ function buildPartsList(
  * then alphabetically by name.
  */
 function buildOptimizedPartsList(pieces: PlacedPiece[]): PartsListEntry[] {
-  // Key: "partNumber|ldrawColor" → count
+  // Key: "bricklinkPartNumber|ldrawColor" -> count
   const counts = new Map<string, number>();
 
   for (const piece of pieces) {
-    // Strip the ".dat" suffix so the parts list uses bare part numbers.
-    const barePartNumber = piece.partNumber.replace(/\.dat$/i, '');
-    const key = `${barePartNumber}|${piece.ldrawColor}`;
+    const blPart = toBricklinkPartNumber(piece.bricklinkPartNumber);
+    const key = `${blPart}|${piece.ldrawColor}`;
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
 

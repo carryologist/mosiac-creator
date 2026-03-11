@@ -261,13 +261,9 @@ export function generateLDR(
   const bpStuds = baseplate.sizeStuds;
 
   // -- Header ----------------------------------------------------------------
-  lines.push(commentLine('FILE mosaic.ldr'));
-  lines.push(commentLine('mosaic'));
+  lines.push(commentLine('Mosaic'));
   lines.push(commentLine('Name: mosaic.ldr'));
   lines.push(commentLine('Author: Mosaic Creator'));
-  lines.push(commentLine('!LDRAW_ORG Unofficial_Model'));
-  lines.push(commentLine(`!LICENSE Redistributable under CCAL version 2.0 : see CAreadme.txt`));
-  lines.push(commentLine(''));
   lines.push(commentLine(`Mosaic size: ${widthStuds} x ${heightStuds} studs`));
   lines.push(commentLine(
     `Baseplates: ${baseplateLayout.cols} x ${baseplateLayout.rows}` +
@@ -396,13 +392,9 @@ export function generateOptimizedLDR(
   const bpStuds = baseplate.sizeStuds;
 
   // -- Header ----------------------------------------------------------------
-  lines.push(commentLine('FILE mosaic.ldr'));
-  lines.push(commentLine('mosaic'));
+  lines.push(commentLine('Mosaic'));
   lines.push(commentLine('Name: mosaic.ldr'));
   lines.push(commentLine('Author: Mosaic Creator'));
-  lines.push(commentLine('!LDRAW_ORG Unofficial_Model'));
-  lines.push(commentLine(`!LICENSE Redistributable under CCAL version 2.0 : see CAreadme.txt`));
-  lines.push(commentLine(''));
   lines.push(commentLine(`Mosaic size: ${widthStuds} x ${heightStuds} studs`));
   lines.push(commentLine(
     `Baseplates: ${baseplateLayout.cols} x ${baseplateLayout.rows}` +

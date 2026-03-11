@@ -36,6 +36,16 @@ export interface PieceSize {
    * Empty string if no plate variant exists at this size.
    */
   platePartNumber: string;
+  /**
+   * BrickLink part number for the tile variant (may differ from LDraw).
+   * Empty string if no tile variant exists at this size.
+   */
+  tileBricklinkId: string;
+  /**
+   * BrickLink part number for the plate variant (may differ from LDraw).
+   * Empty string if no plate variant exists at this size.
+   */
+  plateBricklinkId: string;
 }
 
 /** A placed piece in the optimized mosaic. */
@@ -52,8 +62,10 @@ export interface PlacedPiece {
   ldrawColor: number;
   /** LDraw part filename, e.g. "3068b.dat" */
   partNumber: string;
+  /** BrickLink part number, e.g. "3068" */
+  bricklinkPartNumber: string;
   /**
-   * True if the piece is rotated 90° from its natural (cataloged) orientation.
+   * True if the piece is rotated 90 from its natural (cataloged) orientation.
    * In LDraw this maps to the rotation matrix: 0 0 -1  0 1 0  1 0 0
    */
   rotated: boolean;
@@ -83,22 +95,23 @@ export interface OptimizedMosaic {
 
 const RAW_PIECE_DEFINITIONS: readonly PieceSize[] = [
   // Sizes available as BOTH tile and plate
-  { width: 1, height: 1, tilePartNumber: '3070b',  platePartNumber: '3024' },
-  { width: 1, height: 2, tilePartNumber: '3069b',  platePartNumber: '3023' },
-  { width: 1, height: 3, tilePartNumber: '63864',  platePartNumber: '3623' },
-  { width: 1, height: 4, tilePartNumber: '2431',   platePartNumber: '3710' },
-  { width: 1, height: 6, tilePartNumber: '6636',   platePartNumber: '3666' },
-  { width: 1, height: 8, tilePartNumber: '4162',   platePartNumber: '3460' },
-  { width: 2, height: 2, tilePartNumber: '3068b',  platePartNumber: '3022' },
-  { width: 2, height: 3, tilePartNumber: '26603',  platePartNumber: '3021' },
-  { width: 2, height: 4, tilePartNumber: '87079',  platePartNumber: '3020' },
+  //                                          LDraw tile   LDraw plate  BL tile  BL plate
+  { width: 1, height: 1, tilePartNumber: '3070b',  platePartNumber: '3024', tileBricklinkId: '3070',   plateBricklinkId: '3024' },
+  { width: 1, height: 2, tilePartNumber: '3069b',  platePartNumber: '3023', tileBricklinkId: '3069',   plateBricklinkId: '3023' },
+  { width: 1, height: 3, tilePartNumber: '63864',  platePartNumber: '3623', tileBricklinkId: '63864',  plateBricklinkId: '3623' },
+  { width: 1, height: 4, tilePartNumber: '2431',   platePartNumber: '3710', tileBricklinkId: '2431',   plateBricklinkId: '3710' },
+  { width: 1, height: 6, tilePartNumber: '6636',   platePartNumber: '3666', tileBricklinkId: '6636',   plateBricklinkId: '3666' },
+  { width: 1, height: 8, tilePartNumber: '4162',   platePartNumber: '3460', tileBricklinkId: '4162',   plateBricklinkId: '3460' },
+  { width: 2, height: 2, tilePartNumber: '3068b',  platePartNumber: '3022', tileBricklinkId: '3068',   plateBricklinkId: '3022' },
+  { width: 2, height: 3, tilePartNumber: '26603',  platePartNumber: '3021', tileBricklinkId: '26603',  plateBricklinkId: '3021' },
+  { width: 2, height: 4, tilePartNumber: '87079',  platePartNumber: '3020', tileBricklinkId: '87079',  plateBricklinkId: '3020' },
 
   // Sizes available as plate only (no tile variant)
-  { width: 2, height: 6, tilePartNumber: '',        platePartNumber: '3795' },
-  { width: 2, height: 8, tilePartNumber: '',        platePartNumber: '3034' },
-  { width: 4, height: 4, tilePartNumber: '',        platePartNumber: '3031' },
-  { width: 4, height: 6, tilePartNumber: '',        platePartNumber: '3032' },
-  { width: 4, height: 8, tilePartNumber: '',        platePartNumber: '3035' },
+  { width: 2, height: 6, tilePartNumber: '',        platePartNumber: '3795', tileBricklinkId: '',       plateBricklinkId: '3795' },
+  { width: 2, height: 8, tilePartNumber: '',        platePartNumber: '3034', tileBricklinkId: '',       plateBricklinkId: '3034' },
+  { width: 4, height: 4, tilePartNumber: '',        platePartNumber: '3031', tileBricklinkId: '',       plateBricklinkId: '3031' },
+  { width: 4, height: 6, tilePartNumber: '',        platePartNumber: '3032', tileBricklinkId: '',       plateBricklinkId: '3032' },
+  { width: 4, height: 8, tilePartNumber: '',        platePartNumber: '3035', tileBricklinkId: '',       plateBricklinkId: '3035' },
 ];
 
 /**
@@ -376,6 +389,11 @@ export function optimizePieces(
               ? candidate.piece.tilePartNumber
               : candidate.piece.platePartNumber;
 
+          const bricklinkPartNumber =
+            pieceType === 'tile'
+              ? candidate.piece.tileBricklinkId
+              : candidate.piece.plateBricklinkId;
+
           pieces.push({
             row,
             col,
@@ -383,6 +401,7 @@ export function optimizePieces(
             height: candidate.placedHeight,
             ldrawColor: color,
             partNumber: `${basePartNumber}.dat`,
+            bricklinkPartNumber,
             rotated: candidate.rotated,
           });
 
