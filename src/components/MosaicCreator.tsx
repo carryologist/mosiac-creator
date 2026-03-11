@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useCallback, useMemo } from "react";
+import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import {
   generateMosaic,
   generateWantedListXML,
@@ -339,6 +339,24 @@ export default function MosaicCreator() {
     setDragActive(false);
   }, []);
 
+  // Listen for Ctrl+V / Cmd+V paste with image data
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith("image/")) {
+          e.preventDefault();
+          const file = item.getAsFile();
+          if (file) handleFile(file);
+          return;
+        }
+      }
+    };
+    document.addEventListener("paste", handlePaste);
+    return () => document.removeEventListener("paste", handlePaste);
+  }, [handleFile]);
+
   const handleGenerate = useCallback(async () => {
     if (!imageFile) return;
     setIsGenerating(true);
@@ -446,7 +464,7 @@ export default function MosaicCreator() {
               <p className="text-sm text-emerald-400 font-medium">
                 ✓ {imageFile?.name}
               </p>
-              <p className="text-xs text-slate-500">Click or drop to replace</p>
+              <p className="text-xs text-slate-500">Click, drop, or paste to replace</p>
             </div>
           </div>
         ) : (
@@ -471,7 +489,7 @@ export default function MosaicCreator() {
                 Drop your image here
               </p>
               <p className="text-sm text-slate-400">
-                or click to browse · JPG, PNG, WebP
+                or click to browse or paste · JPG, PNG, WebP
               </p>
             </div>
           </div>
