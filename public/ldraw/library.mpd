@@ -1,4 +1,4 @@
-0 FILE parts/2431.dat
+0 FILE 2431.dat
 0 Tile  1 x  4 with Groove
 0 Name: 2431.dat
 0 Author: Santeri Piippo [arezey]
@@ -16,7 +16,7 @@
 
 0 NOFILE
 
-0 FILE parts/26603.dat
+0 FILE 26603.dat
 0 Tile  2 x  3
 0 Name: 26603.dat
 0 Author: Philippe Hurbain [Philo]
@@ -33,7 +33,7 @@
 
 0 NOFILE
 
-0 FILE parts/3020.dat
+0 FILE 3020.dat
 0 Plate  2 x  4
 0 Name: 3020.dat
 0 Author: James Jessiman
@@ -77,7 +77,7 @@
 
 0 NOFILE
 
-0 FILE parts/3021.dat
+0 FILE 3021.dat
 0 Plate  2 x  3
 0 Name: 3021.dat
 0 Author: James Jessiman
@@ -118,7 +118,7 @@
 
 0 NOFILE
 
-0 FILE parts/3022.dat
+0 FILE 3022.dat
 0 Plate  2 x  2
 0 Name: 3022.dat
 0 Author: James Jessiman
@@ -156,7 +156,7 @@
 
 0 NOFILE
 
-0 FILE parts/3023.dat
+0 FILE 3023.dat
 0 ~Moved to 3023b
 0 Name: 3023.dat
 0 Author: Orion Pobursky [OrionP]
@@ -173,7 +173,7 @@
 
 0 NOFILE
 
-0 FILE parts/3023b.dat
+0 FILE 3023b.dat
 0 Plate  1 x  2
 0 Name: 3023b.dat
 0 Author: James Jessiman
@@ -200,7 +200,7 @@
 
 0 NOFILE
 
-0 FILE parts/3024.dat
+0 FILE 3024.dat
 0 Plate  1 x  1
 0 Name: 3024.dat
 0 Author: James Jessiman
@@ -223,7 +223,7 @@
 
 0 NOFILE
 
-0 FILE parts/3031.dat
+0 FILE 3031.dat
 0 Plate  4 x  4
 0 Name: 3031.dat
 0 Author: James Jessiman
@@ -281,7 +281,7 @@
 
 0 NOFILE
 
-0 FILE parts/3032.dat
+0 FILE 3032.dat
 0 Plate  4 x  6
 0 Name: 3032.dat
 0 Author: James Jessiman
@@ -353,7 +353,7 @@
 
 0 NOFILE
 
-0 FILE parts/3034.dat
+0 FILE 3034.dat
 0 Plate  2 x  8
 0 Name: 3034.dat
 0 Author: James Jessiman
@@ -403,7 +403,7 @@
 
 0 NOFILE
 
-0 FILE parts/3035.dat
+0 FILE 3035.dat
 0 Plate  4 x  8
 0 Name: 3035.dat
 0 Author: James Jessiman
@@ -483,7 +483,7 @@
 0
 0 NOFILE
 
-0 FILE parts/3068b.dat
+0 FILE 3068b.dat
 0 Tile  2 x  2 with Groove
 0 Name: 3068b.dat
 0 Author: Takeshi Takahashi [RainbowDolphin]
@@ -508,7 +508,7 @@
 
 0 NOFILE
 
-0 FILE parts/3069b.dat
+0 FILE 3069b.dat
 0 Tile  1 x  2 with Groove
 0 Name: 3069b.dat
 0 Author: Santeri Piippo [arezey]
@@ -528,7 +528,7 @@
 
 0 NOFILE
 
-0 FILE parts/3070b.dat
+0 FILE 3070b.dat
 0 Tile  1 x  1 with Groove
 0 Name: 3070b.dat
 0 Author: Chris Dee [cwdee]
@@ -548,7 +548,7 @@
 0
 0 NOFILE
 
-0 FILE parts/3460.dat
+0 FILE 3460.dat
 0 Plate  1 x  8
 0 Name: 3460.dat
 0 Author: James Jessiman
@@ -570,7 +570,7 @@
 
 0 NOFILE
 
-0 FILE parts/3623.dat
+0 FILE 3623.dat
 0 Plate  1 x  3
 0 Name: 3623.dat
 0 Author: James Jessiman
@@ -592,7 +592,7 @@
 
 0 NOFILE
 
-0 FILE parts/3666.dat
+0 FILE 3666.dat
 0 Plate  1 x  6
 0 Name: 3666.dat
 0 Author: James Jessiman
@@ -614,7 +614,7 @@
 
 0 NOFILE
 
-0 FILE parts/3710.dat
+0 FILE 3710.dat
 0 Plate  1 x  4
 0 Name: 3710.dat
 0 Author: James Jessiman
@@ -636,7 +636,7 @@
 
 0 NOFILE
 
-0 FILE parts/3795.dat
+0 FILE 3795.dat
 0 Plate  2 x  6
 0 Name: 3795.dat
 0 Author: James Jessiman
@@ -679,7 +679,7 @@
 0
 0 NOFILE
 
-0 FILE parts/3811.dat
+0 FILE 3811.dat
 0 Baseplate 32 x 32
 0 Name: 3811.dat
 0 Author: James Jessiman
@@ -726,7 +726,7 @@
 0
 0 NOFILE
 
-0 FILE parts/3867.dat
+0 FILE 3867.dat
 0 Baseplate 16 x 16
 0 Name: 3867.dat
 0 Author: James Jessiman
@@ -795,7 +795,7 @@
 
 0 NOFILE
 
-0 FILE parts/4162.dat
+0 FILE 4162.dat
 0 Tile  1 x  8
 0 Name: 4162.dat
 0 Author: James Jessiman
@@ -819,7 +819,7 @@
 
 0 NOFILE
 
-0 FILE parts/4186.dat
+0 FILE 4186.dat
 0 Baseplate 48 x 48
 0 Name: 4186.dat
 0 Author: Steve Bliss [sbliss]
@@ -870,7 +870,7 @@
 
 0 NOFILE
 
-0 FILE parts/63864.dat
+0 FILE 63864.dat
 0 Tile  1 x  3
 0 Name: 63864.dat
 0 Author: Tim Gould [timgould]
@@ -889,7 +889,7 @@
 
 0 NOFILE
 
-0 FILE parts/6636.dat
+0 FILE 6636.dat
 0 Tile  1 x  6
 0 Name: 6636.dat
 0 Author: James Jessiman
@@ -914,7 +914,7 @@
 
 0 NOFILE
 
-0 FILE parts/87079.dat
+0 FILE 87079.dat
 0 Tile  2 x  4
 0 Name: 87079.dat
 0 Author: Tim Gould [timgould]
@@ -1399,7 +1399,7 @@
 1 16 -20 4 0 1 0 0 0 -1 0 0 0 1 stud4.dat
 0 NOFILE
 
-0 FILE p/1-4chrd.dat
+0 FILE 1-4chrd.dat
 0 Chord 0.25
 0 Name: 1-4chrd.dat
 0 Author: Max Martin Richter [MMR1988]
@@ -1420,7 +1420,7 @@
 3 16 0.7071 0 0.7071 0.3827 0 0.9239 0.9239 0 0.3827
 0 NOFILE
 
-0 FILE p/1-4cyli.dat
+0 FILE 1-4cyli.dat
 0 Cylinder 0.25
 0 Name: 1-4cyli.dat
 0 Author: James Jessiman
@@ -1449,7 +1449,7 @@
 
 0 NOFILE
 
-0 FILE p/1-4cylo.dat
+0 FILE 1-4cylo.dat
 0 Cylinder Open 0.25
 0 Name: 1-4cylo.dat
 0 Author: Max Martin Richter [MMR1988]
@@ -1467,7 +1467,7 @@
 
 0 NOFILE
 
-0 FILE p/1-4disc.dat
+0 FILE 1-4disc.dat
 0 Disc 0.25
 0 Name: 1-4disc.dat
 0 Author: James Jessiman
@@ -1490,7 +1490,7 @@
 
 0 NOFILE
 
-0 FILE p/1-4edge.dat
+0 FILE 1-4edge.dat
 0 Circle 0.25
 0 Name: 1-4edge.dat
 0 Author: James Jessiman
@@ -1512,7 +1512,7 @@
 
 0 NOFILE
 
-0 FILE p/4-4cyli.dat
+0 FILE 4-4cyli.dat
 0 Cylinder 1.0
 0 Name: 4-4cyli.dat
 0 Author: James Jessiman
@@ -1566,7 +1566,7 @@
 
 0 NOFILE
 
-0 FILE p/4-4disc.dat
+0 FILE 4-4disc.dat
 0 Disc 1.0
 0 Name: 4-4disc.dat
 0 Author: James Jessiman
@@ -1602,7 +1602,7 @@
 
 0 NOFILE
 
-0 FILE p/4-4edge.dat
+0 FILE 4-4edge.dat
 0 Circle 1.0
 0 Name: 4-4edge.dat
 0 Author: James Jessiman
@@ -1638,7 +1638,7 @@
 
 0 NOFILE
 
-0 FILE p/4-4ndis.dat
+0 FILE 4-4ndis.dat
 0 Disc Negative 1.0
 0 Name: 4-4ndis.dat
 0 Author: James Jessiman
@@ -1674,7 +1674,7 @@
 
 0 NOFILE
 
-0 FILE p/4-4ring3.dat
+0 FILE 4-4ring3.dat
 0 Ring  3 x 1.0
 0 Name: 4-4ring3.dat
 0 Author: James Jessiman
@@ -1712,7 +1712,7 @@
 
 0 NOFILE
 
-0 FILE p/box4.dat
+0 FILE box4.dat
 0 Box with 4 Faces (2 Parallel Pairs) and All Edges
 0 Name: box4.dat
 0 Author: James Jessiman
@@ -1748,7 +1748,7 @@
 
 0 NOFILE
 
-0 FILE p/box4o8a.dat
+0 FILE box4o8a.dat
 0 Box with 4 Faces (2 Parallel Pairs) without Top and Bottom Edges
 0 Name: box4o8a.dat
 0 Author: Steffen [Steffen]
@@ -1775,7 +1775,7 @@
 
 0 NOFILE
 
-0 FILE p/box4t.dat
+0 FILE box4t.dat
 0 Box with 4 Adjacent Faces and All Edges
 0 Name: box4t.dat
 0 Author: Tore Eriksson [Tore_Eriksson]
@@ -1812,7 +1812,7 @@
 
 0 NOFILE
 
-0 FILE p/box5.dat
+0 FILE box5.dat
 0 Box with 5 Faces and All Edges
 0 Name: box5.dat
 0 Author: James Jessiman
@@ -1849,7 +1849,7 @@
 
 0 NOFILE
 
-0 FILE p/rect2p.dat
+0 FILE rect2p.dat
 0 Rectangle with 2 Parallel Edges
 0 Name: rect2p.dat
 0 Author: Donald Sutter [technog]
@@ -1872,7 +1872,7 @@
 
 0 NOFILE
 
-0 FILE p/stud.dat
+0 FILE stud.dat
 0 Stud
 0 Name: stud.dat
 0 Author: James Jessiman
@@ -1896,7 +1896,7 @@
 
 0 NOFILE
 
-0 FILE p/stud3.dat
+0 FILE stud3.dat
 0 Stud Tube Solid
 0 Name: stud3.dat
 0 Author: James Jessiman
@@ -1920,7 +1920,7 @@
 
 0 NOFILE
 
-0 FILE p/stud4.dat
+0 FILE stud4.dat
 0 Stud Tube Open
 0 Name: stud4.dat
 0 Author: James Jessiman
@@ -1950,7 +1950,7 @@
 
 0 NOFILE
 
-0 FILE p/stug-16x16.dat
+0 FILE stug-16x16.dat
 0 Stud Group 16 x 16
 0 Name: stug-16x16.dat
 0 Author: Steffen [Steffen]
@@ -1968,7 +1968,7 @@
 1 16 80 0 -80 1 0 0 0 1 0 0 0 1 stug-8x8.dat
 0 NOFILE
 
-0 FILE p/stug-1x2.dat
+0 FILE stug-1x2.dat
 0 Stud Group  1 x  2
 0 Name: stug-1x2.dat
 0 Author: Steffen [Steffen]
@@ -1985,7 +1985,7 @@
 
 0 NOFILE
 
-0 FILE p/stug-1x3.dat
+0 FILE stug-1x3.dat
 0 Stud Group  1 x  3
 0 Name: stug-1x3.dat
 0 Author: Steffen [Steffen]
@@ -2003,7 +2003,7 @@
 
 0 NOFILE
 
-0 FILE p/stug-1x4.dat
+0 FILE stug-1x4.dat
 0 Stud Group  1 x  4
 0 Name: stug-1x4.dat
 0 Author: Steffen [Steffen]
@@ -2022,7 +2022,7 @@
 
 0 NOFILE
 
-0 FILE p/stug-1x6.dat
+0 FILE stug-1x6.dat
 0 Stud Group  1 x  6
 0 Name: stug-1x6.dat
 0 Author: Steffen [Steffen]
@@ -2043,7 +2043,7 @@
 
 0 NOFILE
 
-0 FILE p/stug-1x8.dat
+0 FILE stug-1x8.dat
 0 Stud Group  1 x  8
 0 Name: stug-1x8.dat
 0 Author: Steffen [Steffen]
@@ -2066,7 +2066,7 @@
 
 0 NOFILE
 
-0 FILE p/stug-2x2.dat
+0 FILE stug-2x2.dat
 0 Stud Group  2 x  2
 0 Name: stug-2x2.dat
 0 Author: Steffen [Steffen]
@@ -2091,7 +2091,7 @@
 
 0 NOFILE
 
-0 FILE p/stug-4x4.dat
+0 FILE stug-4x4.dat
 0 Stud Group  4 x  4
 0 Name: stug-4x4.dat
 0 Author: Tore Eriksson [Tore_Eriksson]
@@ -2116,7 +2116,7 @@
 
 0 NOFILE
 
-0 FILE p/stug-8x8.dat
+0 FILE stug-8x8.dat
 0 Stud Group  8 x  8
 0 Name: stug-8x8.dat
 0 Author: Tore Eriksson [Tore_Eriksson]
@@ -2140,7 +2140,7 @@
 
 0 NOFILE
 
-0 FILE p/stug3-1x3.dat
+0 FILE stug3-1x3.dat
 0 Stud Tube Solid Group  1 x  3
 0 Name: stug3-1x3.dat
 0 Author: Steffen [Steffen]
@@ -2158,7 +2158,7 @@
 
 0 NOFILE
 
-0 FILE p/stug3-1x5.dat
+0 FILE stug3-1x5.dat
 0 Stud Tube Solid Group  1 x  5
 0 Name: stug3-1x5.dat
 0 Author: Steffen [Steffen]
@@ -2178,7 +2178,7 @@
 
 0 NOFILE
 
-0 FILE p/stug3-1x7.dat
+0 FILE stug3-1x7.dat
 0 Stud Tube Solid Group  1 x  7
 0 Name: stug3-1x7.dat
 0 Author: Steffen [Steffen]
@@ -2200,7 +2200,7 @@
 
 0 NOFILE
 
-0 FILE p/stug4-1x2.dat
+0 FILE stug4-1x2.dat
 0 Stud Tube Open Group  1 x  2
 0 Name: stug4-1x2.dat
 0 Author: Steffen [Steffen]
@@ -2217,7 +2217,7 @@
 
 0 NOFILE
 
-0 FILE p/stug8.dat
+0 FILE stug8.dat
 0 ~Moved to stug-8x8
 0 Name: stug8.dat
 0 Author: [PTadmin]
