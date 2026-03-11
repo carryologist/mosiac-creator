@@ -374,8 +374,17 @@ import type { PlacedPiece } from './pieceOptimizer';
  * Each PlacedPiece has row, col, width, height, ldrawColor, partNumber (.dat),
  * and rotated flag.
  *
- * When rotated is false, use identity matrix: 1 0 0 0 1 0 0 0 1
- * When rotated is true, use 90-degree Y rotation: 0 0 -1 0 1 0 1 0 0
+ * LDraw part files have their second catalog dimension (height) along X and
+ * their first catalog dimension (width) along Z.  On the placement grid,
+ * columns are X and rows are Z.
+ *
+ * When rotated is false (width cols × height rows), the grid has width in X
+ * and height in Z — swapped relative to the LDraw part's native axes — so a
+ * 90-degree Y rotation is applied: 0 0 -1 0 1 0 1 0 0
+ *
+ * When rotated is true (height cols × width rows), the grid has height in X
+ * and width in Z, matching the LDraw native layout, so identity is used:
+ * 1 0 0 0 1 0 0 0 1
  *
  * @param config - Mosaic configuration (dimensions, piece type, baseplate layout)
  * @param pieces - Array of optimized placed pieces with position, size, color,
@@ -431,7 +440,7 @@ export function generateOptimizedLDR(
     const centerZ = (zTop + zBottom) / 2;
 
     // Select rotation matrix based on the rotated flag
-    const matrix = piece.rotated ? ROTATED_90_Y_MATRIX : IDENTITY_MATRIX;
+    const matrix = piece.rotated ? IDENTITY_MATRIX : ROTATED_90_Y_MATRIX;
 
     lines.push(partLineWithMatrix(
       piece.ldrawColor,

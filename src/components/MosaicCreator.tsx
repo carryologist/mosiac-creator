@@ -343,6 +343,7 @@ export default function MosaicCreator() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<MosaicResult | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [show3DViewer, setShow3DViewer] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -426,6 +427,7 @@ export default function MosaicCreator() {
   const handleGenerate = useCallback(async () => {
     if (!imageFile) return;
     setIsGenerating(true);
+    setShow3DViewer(false);
     try {
       const mosaicResult = await generateMosaic(imageFile, selectedSize, {
         pieceType: pieceType === "tile" ? "3070b" : "3024",
@@ -701,17 +703,31 @@ export default function MosaicCreator() {
               </div>
 
               {/* 3D LDraw Preview */}
-              <div className="bg-slate-800/60 rounded-2xl p-6 border border-slate-700/50">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
-                    3D Preview
-                  </h2>
+              {show3DViewer ? (
+                <div className="bg-slate-800/60 rounded-2xl p-6 border border-slate-700/50">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
+                      3D Preview
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      Click and drag to rotate · Scroll to zoom
+                    </p>
+                  </div>
+                  <LDrawViewer ldrContent={result.ldrContent} height={500} />
+                </div>
+              ) : (
+                <div className="bg-slate-800/60 rounded-2xl p-6 border border-slate-700/50 flex flex-col items-center justify-center h-[200px] gap-3">
+                  <button
+                    onClick={() => setShow3DViewer(true)}
+                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl transition-colors shadow-lg shadow-blue-600/20"
+                  >
+                    Show 3D Preview
+                  </button>
                   <p className="text-xs text-slate-500">
-                    Click and drag to rotate · Scroll to zoom
+                    May take a moment for large mosaics
                   </p>
                 </div>
-                <LDrawViewer ldrContent={result.ldrContent} height={500} />
-              </div>
+              )}
 
               {/* Stats Row */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
