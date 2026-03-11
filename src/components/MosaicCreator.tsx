@@ -144,6 +144,8 @@ function SettingsPanel({
   onAdjustmentsChange,
   optimize,
   onOptimizeChange,
+  minimizeColors,
+  onMinimizeColorsChange,
   imagePreview,
   compact,
 }: {
@@ -155,6 +157,8 @@ function SettingsPanel({
   onAdjustmentsChange: (a: ImageAdjustments) => void;
   optimize: boolean;
   onOptimizeChange: (o: boolean) => void;
+  minimizeColors: boolean;
+  onMinimizeColorsChange: (v: boolean) => void;
   imagePreview: string | null;
   compact?: boolean;
 }) {
@@ -259,6 +263,32 @@ function SettingsPanel({
         </div>
       </div>
 
+      {/* Minimize Colors Toggle */}
+      <div className={cardClass}>
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className={headingClass + " !mb-1"}>Minimize Colors</h3>
+            <p className="text-xs text-slate-500">
+              Merge rare colors into nearest common color
+            </p>
+          </div>
+          <button
+            onClick={() => onMinimizeColorsChange(!minimizeColors)}
+            className={`
+              relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0
+              ${minimizeColors ? "bg-blue-600" : "bg-slate-600"}
+            `}
+          >
+            <span
+              className={`
+                absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200
+                ${minimizeColors ? "translate-x-5" : "translate-x-0"}
+              `}
+            />
+          </button>
+        </div>
+      </div>
+
       {/* Image Adjustments */}
       <div className={cardClass}>
         <h3 className={headingClass}>Image Adjustments</h3>
@@ -294,6 +324,7 @@ export default function MosaicCreator() {
   const [selectedSize, setSelectedSize] = useState<MosaicSize>(MOSAIC_SIZES[1]); // 32x32 default
   const [pieceType, setPieceType] = useState<PieceType>("tile");
   const [optimize, setOptimize] = useState(false);
+  const [minimizeColors, setMinimizeColors] = useState(false);
   const [adjustments, setAdjustments] = useState<ImageAdjustments>({
     brightness: 0,
     contrast: 0,
@@ -367,6 +398,7 @@ export default function MosaicCreator() {
         contrast: adjustments.contrast,
         saturation: adjustments.saturation,
         optimize,
+        minimizeColors,
       });
       setResult(mosaicResult);
       setStep(2);
@@ -376,7 +408,7 @@ export default function MosaicCreator() {
     } finally {
       setIsGenerating(false);
     }
-  }, [imageFile, selectedSize, pieceType, adjustments, optimize]);
+  }, [imageFile, selectedSize, pieceType, adjustments, optimize, minimizeColors]);
 
   const handleDownloadLdr = useCallback(() => {
     if (!result) return;
@@ -508,6 +540,8 @@ export default function MosaicCreator() {
             onAdjustmentsChange={setAdjustments}
             optimize={optimize}
             onOptimizeChange={setOptimize}
+            minimizeColors={minimizeColors}
+            onMinimizeColorsChange={setMinimizeColors}
             imagePreview={imagePreview}
           />
 
@@ -562,11 +596,12 @@ export default function MosaicCreator() {
               onPieceTypeChange={setPieceType}
               adjustments={adjustments}
               onAdjustmentsChange={setAdjustments}
-              optimize={optimize}
-              onOptimizeChange={setOptimize}
-              imagePreview={imagePreview}
-              compact
-            />
+            optimize={optimize}
+            onOptimizeChange={setOptimize}
+            minimizeColors={minimizeColors}
+            onMinimizeColorsChange={setMinimizeColors}
+            imagePreview={imagePreview}
+            compact            />
 
             {/* Re-generate button */}
             <div className="mt-4">

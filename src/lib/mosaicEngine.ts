@@ -12,7 +12,7 @@
 // =============================================================================
 
 import type { LegoColor, RGB } from './colors';
-import { findNearestColor, byLdrawCode } from './colors';
+import { findNearestColor, byLdrawCode, ciede2000 } from './colors';
 import { generateLDR, generateOptimizedLDR, createMosaicConfig } from './ldraw';
 import type { MosaicConfig } from './ldraw';
 import { processImage, generatePreviewDataURL } from './imageProcessor';
@@ -231,6 +231,94 @@ function buildOptimizedPartsList(pieces: PlacedPiece[]): PartsListEntry[] {
   return entries;
 }
 
+/**
+ * Post-process the colour grids to eliminate rare/noisy colours.
+ *
+ * Any colour that accounts for fewer than `thresholdPercent` of all studs is
+ * considered "rare".  Each rare-colour stud is reassigned to the nearest
+ * (CIEDE2000) colour that IS above the threshold.
+ *
+ * This cleans up anti-aliasing artefacts like stray blue studs in an
+ * otherwise all-purple image.
+ */
+function minimizeColorGrid(
+  ldrawColorGrid: number[][],
+  colorGrid: string[][],
+  thresholdPercent: number = 2,
+): { ldrawColorGrid: number[][]; colorGrid: string[][] } {
+  // Count frequency of each LDraw color
+  const counts = new Map<number, number>();
+  let total = 0;
+  for (const row of ldrawColorGrid) {
+    for (const code of row) {
+      counts.set(code, (counts.get(code) ?? 0) + 1);
+      total++;
+    }
+  }
+
+  const threshold = total * (thresholdPercent / 100);
+
+  // Split into kept vs rare
+  const keptCodes: number[] = [];
+  const rareCodes: number[] = [];
+  for (const [code, count] of counts) {
+    if (count >= threshold) {
+      keptCodes.push(code);
+    } else {
+      rareCodes.push(code);
+    }
+  }
+
+  // Nothing to do if there are no rare colors
+  if (rareCodes.length === 0) {
+    return { ldrawColorGrid, colorGrid };
+  }
+
+  // Build remap: rare color -> nearest kept color via CIEDE2000
+  const remap = new Map<number, number>();
+  for (const rareCode of rareCodes) {
+    const rareLego = byLdrawCode.get(rareCode);
+    if (!rareLego) continue;
+
+    let bestCode = keptCodes[0];
+    let bestDist = Infinity;
+    for (const keptCode of keptCodes) {
+      const keptLego = byLdrawCode.get(keptCode);
+      if (!keptLego) continue;
+      const d = ciede2000(rareLego.lab, keptLego.lab);
+      if (d < bestDist) {
+        bestDist = d;
+        bestCode = keptCode;
+      }
+    }
+    remap.set(rareCode, bestCode);
+  }
+
+  // Apply remapping
+  const newLdraw: number[][] = [];
+  const newColor: string[][] = [];
+  for (let r = 0; r < ldrawColorGrid.length; r++) {
+    const ldrawRow: number[] = [];
+    const colorRow: string[] = [];
+    for (let c = 0; c < ldrawColorGrid[r].length; c++) {
+      const code = ldrawColorGrid[r][c];
+      const remapped = remap.get(code);
+      if (remapped !== undefined) {
+        ldrawRow.push(remapped);
+        const lego = byLdrawCode.get(remapped);
+        colorRow.push(lego?.hex ?? colorGrid[r][c]);
+      } else {
+        ldrawRow.push(code);
+        colorRow.push(colorGrid[r][c]);
+      }
+    }
+    newLdraw.push(ldrawRow);
+    newColor.push(colorRow);
+  }
+
+  return { ldrawColorGrid: newLdraw, colorGrid: newColor };
+}
+
 // =============================================================================
 // Main Pipeline
 // =============================================================================
@@ -261,11 +349,14 @@ export async function generateMosaic(
     saturation?: number;
     /** When true, merge same-color regions into larger standard plates/tiles */
     optimize?: boolean;
+    /** When true, merge rare colors into their nearest common color */
+    minimizeColors?: boolean;
   },
 ): Promise<MosaicResult> {
   const { widthStuds, heightStuds } = size;
   const pieceType = options?.pieceType ?? '3070b';
   const optimize = options?.optimize ?? false;
+  const minimizeColors = options?.minimizeColors ?? false;
 
   // ── Step 1: Process the source image ─────────────────────────────────────
   const pixelData = await processImage(file, widthStuds, heightStuds, {
@@ -292,6 +383,16 @@ export async function generateMosaic(
 
     colorGrid.push(hexRow);
     ldrawColorGrid.push(codeRow);
+  }
+
+  // ── Step 2b: Minimize colours (merge rare colours into common ones) ─────
+  if (minimizeColors) {
+    const merged = minimizeColorGrid(ldrawColorGrid, colorGrid);
+    // Overwrite grids in place
+    for (let r = 0; r < heightStuds; r++) {
+      ldrawColorGrid[r] = merged.ldrawColorGrid[r];
+      colorGrid[r] = merged.colorGrid[r];
+    }
   }
 
   // ── Step 3: Render the stud-grid preview ─────────────────────────────────
