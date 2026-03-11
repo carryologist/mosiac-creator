@@ -132,24 +132,43 @@ function resizeToCanvas(
     const step = document.createElement('canvas');
     step.width = halfW;
     step.height = halfH;
-    const ctx = step.getContext('2d')!;
+    const ctx = step.getContext('2d');
+    if (!ctx) {
+      throw new Error('Failed to acquire 2D canvas context — browser may be out of GPU resources.');
+    }
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(srcCanvas, 0, 0, srcW, srcH, 0, 0, halfW, halfH);
 
+    // Free GPU memory from the intermediate canvas that is no longer needed.
+    const prevCanvas = srcCanvas;
     srcCanvas = step;
     srcW = halfW;
     srcH = halfH;
+
+    if (prevCanvas instanceof HTMLCanvasElement) {
+      prevCanvas.width = 0;
+      prevCanvas.height = 0;
+    }
   }
 
   // Final draw to the exact target size.
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
-  const ctx = canvas.getContext('2d')!;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('Failed to acquire 2D canvas context — browser may be out of GPU resources.');
+  }
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(srcCanvas, 0, 0, srcW, srcH, 0, 0, w, h);
+
+  // Free GPU memory from the last intermediate canvas (if it was a canvas).
+  if (srcCanvas instanceof HTMLCanvasElement) {
+    srcCanvas.width = 0;
+    srcCanvas.height = 0;
+  }
 
   return canvas;
 }
@@ -186,8 +205,15 @@ export async function processImage(
 
   // Resize via canvas (high-quality stepped downsampling).
   const canvas = resizeToCanvas(img, targetWidth, targetHeight);
-  const ctx = canvas.getContext('2d')!;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('Failed to acquire 2D canvas context — browser may be out of GPU resources.');
+  }
   const imageData = ctx.getImageData(0, 0, targetWidth, targetHeight);
+
+  // Free GPU memory from the working canvas now that pixel data is extracted.
+  canvas.width = 0;
+  canvas.height = 0;
   const { data } = imageData; // Uint8ClampedArray, RGBA interleaved
 
   // Pre-compute the contrast factor once (it's the same for every pixel).
@@ -214,10 +240,14 @@ export async function processImage(
 
     for (let col = 0; col < targetWidth; col++) {
       const idx = (row * targetWidth + col) * 4;
-      let r = data[idx];
-      let g = data[idx + 1];
-      let b = data[idx + 2];
-      // alpha (data[idx + 3]) is ignored — we treat transparent as-is.
+
+      // Alpha-blend against black (matching the dark LEGO baseplate).
+      // Fully transparent pixels become black; semi-transparent pixels
+      // darken proportionally.
+      const a = data[idx + 3] / 255;
+      let r = Math.round(data[idx] * a);
+      let g = Math.round(data[idx + 1] * a);
+      let b = Math.round(data[idx + 2] * a);
 
       if (needsAdjustment) {
         [r, g, b] = adjustPixel(
@@ -273,7 +303,10 @@ export function generatePreviewDataURL(
   const canvas = document.createElement('canvas');
   canvas.width = canvasW;
   canvas.height = canvasH;
-  const ctx = canvas.getContext('2d')!;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('Failed to acquire 2D canvas context — browser may be out of GPU resources.');
+  }
 
   // Radius & position of the stud circle relative to each cell.
   const studRadius = pixelSize * 0.3;
@@ -331,5 +364,11 @@ export function generatePreviewDataURL(
     }
   }
 
-  return canvas.toDataURL('image/png');
+  const dataURL = canvas.toDataURL('image/png');
+
+  // Free GPU memory from the preview canvas.
+  canvas.width = 0;
+  canvas.height = 0;
+
+  return dataURL;
 }

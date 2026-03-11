@@ -344,9 +344,34 @@ export default function MosaicCreator() {
       alert("Please upload a JPG, PNG, or WebP image.");
       return;
     }
+    const MAX_FILE_SIZE_MB = 20;
+    if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+      alert(`File is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum size is ${MAX_FILE_SIZE_MB} MB.`);
+      return;
+    }
     setImageFile(file);
     const reader = new FileReader();
-    reader.onload = (e) => setImagePreview(e.target?.result as string);
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      // Validate image dimensions before accepting
+      const img = new Image();
+      img.onload = () => {
+        const MAX_DIMENSION = 16384; // Canvas hard limit in most browsers
+        if (img.width > MAX_DIMENSION || img.height > MAX_DIMENSION) {
+          alert(
+            `Image dimensions (${img.width}×${img.height}) exceed the maximum of ${MAX_DIMENSION}×${MAX_DIMENSION} pixels.`
+          );
+          setImageFile(null);
+          return;
+        }
+        setImagePreview(dataUrl);
+      };
+      img.onerror = () => {
+        alert("Failed to load image. The file may be corrupted.");
+        setImageFile(null);
+      };
+      img.src = dataUrl;
+    };
     reader.readAsDataURL(file);
   }, []);
 
