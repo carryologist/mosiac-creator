@@ -75,6 +75,8 @@ interface NumberingResult {
   grid: number[][];
   /** True when entries represent part+color combos, false for color-only. */
   isPartLevel: boolean;
+  /** Maps "bricklinkPartNumber_ldrawColor" → entry number (optimized only). */
+  pieceKeyToNumber?: Map<string, number>;
 }
 
 // =============================================================================
@@ -182,7 +184,7 @@ function buildNumbering(result: MosaicResult): NumberingResult {
       }
     }
 
-    return { entries, grid, isPartLevel: true };
+    return { entries, grid, isPartLevel: true, pieceKeyToNumber: keyToNum };
   }
 
   // -- Non-optimized: number by color --------------------------------------
@@ -511,6 +513,138 @@ function renderBOM(
 }
 
 /**
+ * Render a full-mosaic overview page showing all pieces and section boundaries.
+ *
+ * Gives a zoomed-out view so the builder can see which pieces span
+ * sub-section boundaries before diving into the per-section detail pages.
+ */
+function renderOverviewPage(
+  doc: jsPDF,
+  result: MosaicResult,
+  numbering: NumberingResult,
+): void {
+  const { widthStuds, heightStuds } = result.config;
+
+  // Header
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  setTextColor(doc, TEXT_DARK);
+  doc.text('Full Mosaic Overview', MARGIN, MARGIN + 8);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  setTextColor(doc, TEXT_MID);
+  const subCols = Math.ceil(widthStuds / SUB_SECTION_SIZE);
+  const subRows = Math.ceil(heightStuds / SUB_SECTION_SIZE);
+  const totalSections = subRows * subCols;
+  doc.text(
+    `${widthStuds}\u00d7${heightStuds} studs \u2014 ${totalSections} section${totalSections > 1 ? 's' : ''}`,
+    MARGIN,
+    MARGIN + 15,
+  );
+
+  // Grid layout
+  const gridTopY = MARGIN + 22;
+  const availW = USABLE_W;
+  const availH = USABLE_H - (gridTopY - MARGIN);
+  const cellSize = Math.min(availW / widthStuds, availH / heightStuds);
+  const gridW = cellSize * widthStuds;
+  const gridH = cellSize * heightStuds;
+  const gridX = MARGIN + (availW - gridW) / 2;
+  const gridY = gridTopY;
+
+  // Colored fills
+  for (let r = 0; r < heightStuds; r++) {
+    for (let c = 0; c < widthStuds; c++) {
+      const hex = result.colorGrid[r][c];
+      fillRect(doc, gridX + c * cellSize, gridY + r * cellSize, cellSize, cellSize, hex);
+    }
+  }
+
+  // Cell numbers (only if cells are large enough to read)
+  if (cellSize >= 3.0) {
+    const fontSize = Math.max(3, Math.min(6, cellSize * 1.4));
+    for (let r = 0; r < heightStuds; r++) {
+      for (let c = 0; c < widthStuds; c++) {
+        const hex = result.colorGrid[r][c];
+        const entryNum = numbering.grid[r]?.[c] ?? 0;
+        if (entryNum > 0) {
+          centeredText(
+            doc, String(entryNum),
+            gridX + c * cellSize, gridY + r * cellSize,
+            cellSize, cellSize,
+            contrastText(hex), fontSize,
+          );
+        }
+      }
+    }
+  }
+
+  // Light internal grid lines
+  setStroke(doc, LINE_COLOR);
+  doc.setLineWidth(0.05);
+  for (let c = 1; c < widthStuds; c++) {
+    const x = gridX + c * cellSize;
+    doc.line(x, gridY, x, gridY + gridH);
+  }
+  for (let r = 1; r < heightStuds; r++) {
+    const y = gridY + r * cellSize;
+    doc.line(gridX, y, gridX + gridW, y);
+  }
+
+  // Piece boundaries (optimized mode)
+  if (result.optimized) {
+    setStroke(doc, '#334155');
+    doc.setLineWidth(0.3);
+    for (const piece of result.optimized.pieces) {
+      const px = gridX + piece.col * cellSize;
+      const py = gridY + piece.row * cellSize;
+      const pw = piece.width * cellSize;
+      const ph = piece.height * cellSize;
+      doc.rect(px, py, pw, ph, 'S');
+    }
+  }
+
+  // Section boundary lines
+  if (totalSections > 1) {
+    setStroke(doc, '#3b82f6');
+    doc.setLineWidth(0.6);
+    for (let c = 1; c < subCols; c++) {
+      const x = gridX + c * SUB_SECTION_SIZE * cellSize;
+      doc.line(x, gridY, x, gridY + gridH);
+    }
+    for (let r = 1; r < subRows; r++) {
+      const y = gridY + r * SUB_SECTION_SIZE * cellSize;
+      doc.line(gridX, y, gridX + gridW, y);
+    }
+
+    // Section number labels
+    doc.setFont('helvetica', 'bold');
+    const secFontSize = Math.max(6, Math.min(14, SUB_SECTION_SIZE * cellSize * 0.3));
+    let secNum = 0;
+    for (let sr = 0; sr < subRows; sr++) {
+      for (let sc = 0; sc < subCols; sc++) {
+        secNum++;
+        const sx = gridX + sc * SUB_SECTION_SIZE * cellSize;
+        const sy = gridY + sr * SUB_SECTION_SIZE * cellSize;
+        // White background pill for readability
+        const lblW = secFontSize * 1.1;
+        const lblH = secFontSize * 0.75;
+        fillRect(doc, sx + 0.3, sy + 0.3, lblW, lblH, '#FFFFFF');
+        strokeRect(doc, sx + 0.3, sy + 0.3, lblW, lblH, '#3b82f6', 0.2);
+        // Label
+        doc.setFontSize(secFontSize * 0.65);
+        setTextColor(doc, '#1e40af');
+        doc.text(String(secNum), sx + 0.8, sy + secFontSize * 0.6);
+      }
+    }
+  }
+
+  // Outer border
+  strokeRect(doc, gridX, gridY, gridW, gridH, TEXT_MID, 0.4);
+}
+
+/**
  * Render a section page for one sub-section of the mosaic.
  */
 function renderSectionPage(
@@ -706,13 +840,25 @@ function renderSectionPage(
   // -- Per-section parts summary -------------------------------------------
   const summaryY = gridY + gridH + 6;
 
-  // Count entry numbers in this section
+  // Count pieces in this section.
+  // Optimized mode: count actual pieces whose origin falls in section bounds.
+  // Non-optimized mode: count from grid (each cell = one 1×1 piece).
   const sectionCounts = new Map<number, number>();
-  for (let r = startRow; r < endRow; r++) {
-    for (let c = startCol; c < endCol; c++) {
-      const n = numbering.grid[r]?.[c] ?? 0;
-      if (n > 0) {
-        sectionCounts.set(n, (sectionCounts.get(n) ?? 0) + 1);
+
+  if (numbering.isPartLevel && result.optimized && numbering.pieceKeyToNumber) {
+    for (const piece of result.optimized.pieces) {
+      if (piece.row >= startRow && piece.row < endRow &&
+          piece.col >= startCol && piece.col < endCol) {
+        const key = `${piece.bricklinkPartNumber}_${piece.ldrawColor}`;
+        const n = numbering.pieceKeyToNumber.get(key);
+        if (n) sectionCounts.set(n, (sectionCounts.get(n) ?? 0) + 1);
+      }
+    }
+  } else {
+    for (let r = startRow; r < endRow; r++) {
+      for (let c = startCol; c < endCol; c++) {
+        const n = numbering.grid[r]?.[c] ?? 0;
+        if (n > 0) sectionCounts.set(n, (sectionCounts.get(n) ?? 0) + 1);
       }
     }
   }
@@ -792,6 +938,10 @@ export function generateInstructionsPDF(result: MosaicResult): Blob {
   // Page N+: Bill of materials
   doc.addPage();
   renderBOM(doc, result);
+
+  // Full-mosaic overview page (before per-section detail)
+  doc.addPage();
+  renderOverviewPage(doc, result, numbering);
 
   // Section pages: one per 16×16 sub-section
   const { widthStuds, heightStuds } = result.config;
