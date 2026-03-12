@@ -3,13 +3,14 @@
 //
 // Generates a multi-page PDF instruction booklet for building a LEGO mosaic,
 // following the official LEGO Art instruction style: numbered colors inside a
-// top-down grid, one baseplate section per page.
+// top-down grid, one sub-section per page.
 //
 // Pages:
 //   1. Cover — mosaic preview, dimensions, piece count
 //   2. Color legend — sequential number → LEGO color mapping
 //   3. Bill of materials — parts list table
-//   4+. Section pages — one per baseplate, numbered grid with color fills
+//   4+. Section pages — one per 16×16 sub-section, numbered grid with
+//       color fills, major grid lines every 8 studs, piece boundaries
 //
 // Uses jsPDF for vector PDF generation (small file sizes, crisp at any zoom).
 // Zero external API calls — runs entirely in the browser.
@@ -37,6 +38,12 @@ const TEXT_MID = '#64748b';
 const TEXT_LIGHT = '#94a3b8';
 const LINE_COLOR = '#cbd5e1';
 const BG_LIGHT = '#f1f5f9';
+
+/** Each instruction page covers at most this many studs per axis. */
+const SUB_SECTION_SIZE = 16;
+
+/** Thicker grid lines are drawn at this interval for visual orientation. */
+const MAJOR_LINE_INTERVAL = 8;
 
 // =============================================================================
 // Types
@@ -383,26 +390,27 @@ function renderBOM(
 }
 
 /**
- * Render a section page for one baseplate.
+ * Render a section page for one sub-section of the mosaic.
+ *
+ * Each page covers the rectangle [startRow..endRow) × [startCol..endCol).
+ * The gridRow/gridCol/gridRows/gridCols parameters drive the locator
+ * thumbnail that shows where this sub-section sits in the overall mosaic.
  */
 function renderSectionPage(
   doc: jsPDF,
   result: MosaicResult,
   colorMap: Map<number, NumberedColor>,
-  bpRow: number,
-  bpCol: number,
+  startRow: number,
+  startCol: number,
+  endRow: number,
+  endCol: number,
   sectionNum: number,
   totalSections: number,
+  gridRow: number,
+  gridCol: number,
+  gridRows: number,
+  gridCols: number,
 ): void {
-  const layout = result.config.baseplateLayout;
-  const bpSize = layout.baseplate.sizeStuds;
-  const { widthStuds, heightStuds } = result.config;
-
-  // Section sub-grid boundaries
-  const startRow = bpRow * bpSize;
-  const endRow = Math.min(startRow + bpSize, heightStuds);
-  const startCol = bpCol * bpSize;
-  const endCol = Math.min(startCol + bpSize, widthStuds);
   const sectionW = endCol - startCol;
   const sectionH = endRow - startRow;
 
@@ -416,22 +424,22 @@ function renderSectionPage(
   doc.setFontSize(9);
   setTextColor(doc, TEXT_MID);
   doc.text(
-    `${bpSize}×${bpSize} baseplate — rows ${startRow + 1}–${endRow}, columns ${startCol + 1}–${endCol}`,
+    `Rows ${startRow + 1}\u2013${endRow}, columns ${startCol + 1}\u2013${endCol}`,
     MARGIN,
     MARGIN + 15,
   );
 
-  // -- Locator thumbnail (multi-baseplate only) ----------------------------
+  // -- Locator thumbnail (multi-section only) -------------------------------
   if (totalSections > 1) {
     const thumbSize = 24;
     const thumbX = PAGE_W - MARGIN - thumbSize;
     const thumbY = MARGIN + 2;
-    const thumbCellW = thumbSize / layout.cols;
-    const thumbCellH = thumbSize / layout.rows;
+    const thumbCellW = thumbSize / gridCols;
+    const thumbCellH = thumbSize / gridRows;
 
-    for (let tr = 0; tr < layout.rows; tr++) {
-      for (let tc = 0; tc < layout.cols; tc++) {
-        const isCurrent = tr === bpRow && tc === bpCol;
+    for (let tr = 0; tr < gridRows; tr++) {
+      for (let tc = 0; tc < gridCols; tc++) {
+        const isCurrent = tr === gridRow && tc === gridCol;
         fillRect(
           doc,
           thumbX + tc * thumbCellW,
@@ -474,14 +482,14 @@ function renderSectionPage(
   setTextColor(doc, TEXT_MID);
 
   for (let c = 0; c < sectionW; c++) {
-    const label = String(c + 1);
+    const label = String(startCol + c + 1);
     const lw = doc.getTextWidth(label);
     doc.text(label, gridX + c * cellSize + (cellSize - lw) / 2, gridY - 1.5);
   }
 
   // -- Row numbers ----------------------------------------------------------
   for (let r = 0; r < sectionH; r++) {
-    const label = String(r + 1);
+    const label = String(startRow + r + 1);
     const fontMm = labelFontSize * 0.353;
     doc.text(
       label,
@@ -525,6 +533,22 @@ function renderSectionPage(
   for (let r = 1; r < sectionH; r++) {
     const y = gridY + r * cellSize;
     doc.line(gridX, y, gridX + gridW, y);
+  }
+
+  // -- Major grid lines every N studs for orientation -----------------------
+  setStroke(doc, TEXT_MID);
+  doc.setLineWidth(0.25);
+  for (let c = 1; c < sectionW; c++) {
+    if ((startCol + c) % MAJOR_LINE_INTERVAL === 0) {
+      const x = gridX + c * cellSize;
+      doc.line(x, gridY, x, gridY + gridH);
+    }
+  }
+  for (let r = 1; r < sectionH; r++) {
+    if ((startRow + r) % MAJOR_LINE_INTERVAL === 0) {
+      const y = gridY + r * cellSize;
+      doc.line(gridX, y, gridX + gridW, y);
+    }
   }
 
   // -- Piece boundaries (optimized mode) -----------------------------------
@@ -595,7 +619,7 @@ function renderSectionPage(
   const maxBx = PAGE_W - MARGIN;
 
   for (const { entry, count } of sectionEntries) {
-    const label = `×${count}`;
+    const label = `\u00d7${count}`;
     const labelW = doc.getTextWidth(label);
     const itemW = badgeSize + 1 + labelW + badgeGap + 2;
 
@@ -624,6 +648,11 @@ function renderSectionPage(
 /**
  * Generate a PDF instruction booklet for a LEGO mosaic.
  *
+ * The mosaic is divided into 16×16 sub-sections (matching the LEGO Art
+ * instruction style). Each sub-section gets its own page with large,
+ * readable cells, major grid lines every 8 studs, and a locator thumbnail
+ * showing where it sits in the overall mosaic.
+ *
  * @param result - The mosaic result from generateMosaic()
  * @returns A Blob containing the PDF data, ready for download
  */
@@ -643,16 +672,28 @@ export function generateInstructionsPDF(result: MosaicResult): Blob {
   doc.addPage();
   renderBOM(doc, result, colorMap);
 
-  // Section pages: one per baseplate
-  const layout = result.config.baseplateLayout;
-  const totalSections = layout.rows * layout.cols;
+  // Section pages: one per 16×16 sub-section
+  const { widthStuds, heightStuds } = result.config;
+  const subCols = Math.ceil(widthStuds / SUB_SECTION_SIZE);
+  const subRows = Math.ceil(heightStuds / SUB_SECTION_SIZE);
+  const totalSections = subRows * subCols;
   let sectionNum = 0;
 
-  for (let bpRow = 0; bpRow < layout.rows; bpRow++) {
-    for (let bpCol = 0; bpCol < layout.cols; bpCol++) {
+  for (let subR = 0; subR < subRows; subR++) {
+    for (let subC = 0; subC < subCols; subC++) {
       sectionNum++;
       doc.addPage();
-      renderSectionPage(doc, result, colorMap, bpRow, bpCol, sectionNum, totalSections);
+      const sr = subR * SUB_SECTION_SIZE;
+      const sc = subC * SUB_SECTION_SIZE;
+      renderSectionPage(
+        doc, result, colorMap,
+        sr,
+        sc,
+        Math.min(sr + SUB_SECTION_SIZE, heightStuds),
+        Math.min(sc + SUB_SECTION_SIZE, widthStuds),
+        sectionNum, totalSections,
+        subR, subC, subRows, subCols,
+      );
     }
   }
 
