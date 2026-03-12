@@ -618,24 +618,22 @@ function renderOverviewPage(
       doc.line(gridX, y, gridX + gridW, y);
     }
 
-    // Section number labels
+    // Small section number labels tucked into top-left corner
     doc.setFont('helvetica', 'bold');
-    const secFontSize = Math.max(6, Math.min(14, SUB_SECTION_SIZE * cellSize * 0.3));
+    const secLabelSize = 5; // fixed small font
+    doc.setFontSize(secLabelSize);
     let secNum = 0;
     for (let sr = 0; sr < subRows; sr++) {
       for (let sc = 0; sc < subCols; sc++) {
         secNum++;
         const sx = gridX + sc * SUB_SECTION_SIZE * cellSize;
         const sy = gridY + sr * SUB_SECTION_SIZE * cellSize;
-        // White background pill for readability
-        const lblW = secFontSize * 1.1;
-        const lblH = secFontSize * 0.75;
-        fillRect(doc, sx + 0.3, sy + 0.3, lblW, lblH, '#FFFFFF');
-        strokeRect(doc, sx + 0.3, sy + 0.3, lblW, lblH, '#3b82f6', 0.2);
-        // Label
-        doc.setFontSize(secFontSize * 0.65);
+        const lbl = String(secNum);
+        const tw = doc.getTextWidth(lbl);
+        const pad = 0.6;
+        fillRect(doc, sx + 0.2, sy + 0.2, tw + pad * 2, secLabelSize * 0.42 + pad * 2, '#FFFFFF');
         setTextColor(doc, '#1e40af');
-        doc.text(String(secNum), sx + 0.8, sy + secFontSize * 0.6);
+        doc.text(lbl, sx + 0.2 + pad, sy + 0.2 + pad + secLabelSize * 0.35);
       }
     }
   }
