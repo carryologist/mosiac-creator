@@ -1,0 +1,62 @@
+THIRD-PARTY LICENSES
+====================
+
+This project bundles or depends on the following third-party software and
+data. Each component is listed below with its license and attribution.
+
+
+================================================================================
+LDraw Parts Library
+================================================================================
+
+75 part files (parts, sub-parts, and primitives) plus LDConfig.ldr (color
+definitions) are bundled in public/ldraw/.
+
+Source:     https://www.ldraw.org/
+License:    Creative Commons Attribution 4.0 International (CC BY 4.0)
+License URL: https://creativecommons.org/licenses/by/4.0/
+Copyright:  LDraw.org contributors
+
+Individual authors are credited in each part file's "0 Author:" header line.
+
+The CAreadme.txt referenced in each part's "0 !LICENSE" line is the LDraw
+Contributor Agreement readme, available at:
+  https://www.ldraw.org/article/349.html
+
+Redistribution note:
+  The part files are redistributed in their original form, packed into a
+  single library.mpd file for efficient loading. The "0 FILE" header names
+  were modified to bare filenames (without directory prefixes) to match the
+  Three.js LDrawLoader's internal cache lookup convention.
+
+
+================================================================================
+Three.js
+================================================================================
+
+Used for 3D rendering, including LDrawLoader, LDrawUtils, and
+LDrawConditionalLineMaterial from the examples/addons modules.
+
+Source:     https://github.com/mrdoob/three.js/
+License:    MIT
+Copyright:  2010-2025 three.js authors
+
+The MIT License
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.

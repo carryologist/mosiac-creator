@@ -1,44 +1,61 @@
 # LEGO Mosaic Creator
 
-Convert any image into a LEGO mosaic file compatible with BrickLink Studio 2.0.
+A web application that converts images into LEGO mosaic build files. Generates LDraw (.ldr) files compatible with BrickLink Studio 2.0, LDView, and LPub3D. Runs entirely in the browser with no server-side processing.
+
+Deployed on Vercel.
 
 ## Features
 
-- **Image Upload**: Drag-and-drop or browse for JPG, PNG, or WebP images
-- **Multiple Mosaic Sizes**: 16x16, 32x32, 48x48, 64x64, and 96x96 stud layouts
-- **Accurate Color Matching**: CIEDE2000 perceptual color matching against 49 real LEGO colors
-- **LDraw Export**: Generates `.ldr` files that open directly in BrickLink Studio
-- **Parts List**: Breakdown of every color and quantity needed, with BrickLink color IDs
-- **Two-Layer Construction**: Baseplate(s) + 1x1 tiles/plates on top
-- **Image Adjustments**: Brightness, contrast, and saturation controls
-- **Piece Type Choice**: Smooth tiles (3070b) or studded plates (3024)
+**Image input** -- Drag-and-drop, file browse, or clipboard paste. Supports JPG, PNG, and WebP up to 20MB / 16384px per dimension.
 
-## How It Works
+**Mosaic sizes** -- Six predefined layouts:
 
-1. Upload a high-resolution image
-2. Choose your mosaic size (determines baseplate layout)
-3. Adjust brightness/contrast/saturation if needed
-4. Generate the mosaic
-5. Preview the result and review the parts list
-6. Download the `.ldr` file and open it in BrickLink Studio
+| Size | Baseplates |
+|------|------------|
+| 16x16 | 1x 16x16 |
+| 32x32 | 1x 32x32 |
+| 48x48 | 1x 48x48 |
+| 64x64 | 4x 32x32 |
+| 96x96 | 2x2 48x48 |
+| 96x96 | 3x3 32x32 |
 
-## Mosaic Sizes
+**Color matching** -- CIEDE2000 perceptual color distance against a palette of 49 real LEGO colors with pre-computed CIE-LAB values.
 
-| Size | Baseplates | Total Pieces |
-|------|-----------|-------------|
-| 16x16 | 1x 16x16 | 256 |
-| 32x32 | 1x 32x32 | 1,024 |
-| 48x48 | 1x 48x48 | 2,304 |
-| 64x64 | 4x 32x32 | 4,096 |
-| 96x96 | 4x 48x48 | 9,216 |
-| 96x96 | 9x 32x32 | 9,216 |
+**Piece types** -- Smooth tiles (3070b) or studded plates (3024).
 
-## Technical Details
+**Minimize Pieces** -- A greedy rectangle-cover algorithm merges adjacent same-color 1x1 cells into larger standard LEGO pieces (14 sizes from 1x1 up to 4x8), reducing total piece count.
 
-- **Color System**: 49 LEGO colors with pre-computed CIE-LAB values for perceptual matching
-- **LDraw Format**: Standard .ldr output compatible with BrickLink Studio, LDView, and LPub3D
-- **Coordinate Math**: Proper LDU positioning with multi-baseplate support
-- **No Server Required**: All processing happens in-browser
+**Minimize Colors** -- Post-processing pass that merges rare colors falling below a 2% threshold into their nearest common color via CIEDE2000. Cleans up noise and anti-aliasing artifacts.
+
+**Image adjustments** -- Brightness, contrast, and saturation sliders applied before color quantization.
+
+**3D preview** -- Interactive Three.js viewer using LDrawLoader that renders the actual LDraw model. Opt-in to avoid loading overhead.
+
+**LDraw export** -- Generates standard .ldr files with multi-baseplate coordinate math. Compatible with BrickLink Studio 2.0, LDView, and LPub3D.
+
+**BrickLink Wanted List** -- Exports XML formatted for direct upload to BrickLink.com to order the exact parts needed.
+
+**Parts list** -- Detailed breakdown with color swatches, quantities, and BrickLink color IDs.
+
+## Tech Stack
+
+- Next.js 16 (App Router), TypeScript, Tailwind CSS v4
+- Three.js with LDrawLoader for 3D preview
+- Canvas API for image processing
+- Zero external API calls -- everything runs client-side
+
+## Architecture
+
+| Module | Purpose |
+|--------|---------|
+| `src/lib/colors.ts` | 49-color LEGO palette with CIE-LAB values and CIEDE2000 matching |
+| `src/lib/imageProcessor.ts` | Canvas-based image resize with brightness/contrast/saturation |
+| `src/lib/pieceOptimizer.ts` | Greedy rectangle-cover algorithm for piece minimization |
+| `src/lib/ldraw.ts` | LDraw .ldr file generation with multi-baseplate coordinate math |
+| `src/lib/mosaicEngine.ts` | Orchestration pipeline tying everything together |
+| `src/components/MosaicCreator.tsx` | Main UI component (2-step workflow) |
+| `src/components/LDrawViewer.tsx` | Three.js 3D viewer for LDraw files |
+| `public/ldraw/` | Bundled LDraw parts library (75 parts, CC BY 4.0) |
 
 ## Development
 
@@ -49,13 +66,8 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-## Deployment
+## License
 
-Deployed on Vercel. Push to `main` to trigger deployment.
+Project code is licensed under the MIT License.
 
-## Tech Stack
-
-- Next.js 16 (App Router)
-- TypeScript
-- Tailwind CSS v4
-- Canvas API for image processing
+LDraw parts library files in `public/ldraw/` are licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) by [LDraw.org](https://www.ldraw.org/) contributors. See `THIRD_PARTY_LICENSES` for details.
