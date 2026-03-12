@@ -1,85 +1,169 @@
 "use client";
 
-import React, { useRef, useEffect, useState, useCallback } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import * as THREE from "three";
-import { LDrawLoader } from "three/addons/loaders/LDrawLoader.js";
-import { LDrawUtils } from "three/addons/utils/LDrawUtils.js";
-import { LDrawConditionalLineMaterial } from "three/addons/materials/LDrawConditionalLineMaterial.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-const LDRAW_LIBRARY_URL = "/ldraw/";
-
 interface LDrawViewerProps {
-  ldrContent: string;
+  /** Hex color grid [row][col], e.g. "#B40000" */
+  colorGrid: string[][];
+  /** Mosaic width in studs */
+  widthStuds: number;
+  /** Mosaic height in studs */
+  heightStuds: number;
   /** Height of the viewer container in pixels (default: 500) */
   height?: number;
 }
 
-export default function LDrawViewer({ ldrContent, height = 500 }: LDrawViewerProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const controlsRef = useRef<OrbitControls | null>(null);
-  const modelRef = useRef<THREE.Group | null>(null);
-  const animFrameRef = useRef<number>(0);
-  
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+// ─── Geometry constants ─────────────────────────────────────────────────────
 
-  // Initialize the Three.js scene once
+/** Size of each 1×1 tile (slightly smaller than 1.0 for visible gaps) */
+const TILE_SIZE = 0.94;
+/** Height of the tile */
+const TILE_HEIGHT = 0.3;
+/** Stud radius */
+const STUD_RADIUS = 0.24;
+/** Stud height */
+const STUD_HEIGHT = 0.1;
+/** Stud cylinder segments */
+const STUD_SEGMENTS = 16;
+/** Baseplate thickness */
+const BP_HEIGHT = 0.2;
+/** Baseplate color */
+const BP_COLOR = "#A3A2A5";
+
+export default function LDrawViewer({
+  colorGrid,
+  widthStuds,
+  heightStuds,
+  height = 500,
+}: LDrawViewerProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const cleanupRef = useRef<(() => void) | null>(null);
+  const [ready, setReady] = useState(false);
+
   useEffect(() => {
     const container = containerRef.current;
-    if (!container) return;
+    if (!container || widthStuds === 0 || heightStuds === 0) return;
 
-    // Renderer
+    // ── Renderer ──────────────────────────────────────────────────────────
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(container.clientWidth, height);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     container.appendChild(renderer.domElement);
-    rendererRef.current = renderer;
 
-    // Scene
+    // ── Scene ─────────────────────────────────────────────────────────────
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x1e293b); // slate-800 to match app theme
-    sceneRef.current = scene;
+    scene.background = new THREE.Color(0x1e293b);
 
-    // Lighting - use ambient + directional for good LEGO rendering
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-    scene.add(ambientLight);
+    // ── Lighting ──────────────────────────────────────────────────────────
+    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
     const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
-    dirLight.position.set(100, 200, 150);
+    dirLight.position.set(widthStuds, widthStuds * 1.5, heightStuds);
     scene.add(dirLight);
-    const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
-    dirLight2.position.set(-100, 100, -150);
+    const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.3);
+    dirLight2.position.set(-widthStuds, widthStuds, -heightStuds);
     scene.add(dirLight2);
 
-    // Camera
+    // ── Camera ────────────────────────────────────────────────────────────
     const camera = new THREE.PerspectiveCamera(
       45,
       container.clientWidth / height,
-      1,
-      20000
+      0.1,
+      widthStuds * 10
     );
-    camera.position.set(200, 400, 600);
-    cameraRef.current = camera;
+    const maxDim = Math.max(widthStuds, heightStuds);
+    const dist = maxDim * 1.2;
+    camera.position.set(dist * 0.7, dist * 0.6, dist * 0.7);
 
-    // Controls
+    // ── Controls ──────────────────────────────────────────────────────────
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.1;
-    controlsRef.current = controls;
+    controls.target.set(widthStuds / 2 - 0.5, 0, heightStuds / 2 - 0.5);
+    controls.update();
 
-    // Animation loop
+    // ── Build mosaic geometry ─────────────────────────────────────────────
+    // Group cells by hex color
+    const colorGroups = new Map<string, { row: number; col: number }[]>();
+    for (let r = 0; r < heightStuds; r++) {
+      for (let c = 0; c < widthStuds; c++) {
+        const hex = colorGrid[r]?.[c];
+        if (!hex) continue;
+        let group = colorGroups.get(hex);
+        if (!group) {
+          group = [];
+          colorGroups.set(hex, group);
+        }
+        group.push({ row: r, col: c });
+      }
+    }
+
+    // Shared geometries
+    const tileGeom = new THREE.BoxGeometry(TILE_SIZE, TILE_HEIGHT, TILE_SIZE);
+    const studGeom = new THREE.CylinderGeometry(
+      STUD_RADIUS,
+      STUD_RADIUS,
+      STUD_HEIGHT,
+      STUD_SEGMENTS
+    );
+
+    const dummy = new THREE.Matrix4();
+
+    for (const [hex, positions] of colorGroups) {
+      const mat = new THREE.MeshStandardMaterial({
+        color: hex,
+        roughness: 0.4,
+        metalness: 0.05,
+      });
+
+      // Tile instances
+      const tileMesh = new THREE.InstancedMesh(tileGeom, mat, positions.length);
+      for (let i = 0; i < positions.length; i++) {
+        const { row, col } = positions[i];
+        dummy.setPosition(col, TILE_HEIGHT / 2, row);
+        tileMesh.setMatrixAt(i, dummy);
+      }
+      tileMesh.instanceMatrix.needsUpdate = true;
+      scene.add(tileMesh);
+
+      // Stud instances (on top of tiles)
+      const studMesh = new THREE.InstancedMesh(studGeom, mat, positions.length);
+      for (let i = 0; i < positions.length; i++) {
+        const { row, col } = positions[i];
+        dummy.setPosition(col, TILE_HEIGHT + STUD_HEIGHT / 2, row);
+        studMesh.setMatrixAt(i, dummy);
+      }
+      studMesh.instanceMatrix.needsUpdate = true;
+      scene.add(studMesh);
+    }
+
+    // Baseplate
+    const bpGeom = new THREE.BoxGeometry(widthStuds, BP_HEIGHT, heightStuds);
+    const bpMat = new THREE.MeshStandardMaterial({
+      color: BP_COLOR,
+      roughness: 0.6,
+    });
+    const bpMesh = new THREE.Mesh(bpGeom, bpMat);
+    bpMesh.position.set(
+      widthStuds / 2 - 0.5,
+      -BP_HEIGHT / 2,
+      heightStuds / 2 - 0.5
+    );
+    scene.add(bpMesh);
+
+    // ── Animation loop ────────────────────────────────────────────────────
+    let animFrame = 0;
     const animate = () => {
-      animFrameRef.current = requestAnimationFrame(animate);
+      animFrame = requestAnimationFrame(animate);
       controls.update();
       renderer.render(scene, camera);
     };
     animate();
+    setReady(true);
 
-    // Handle resize
+    // ── Resize handler ────────────────────────────────────────────────────
     const handleResize = () => {
       if (!container) return;
       const w = container.clientWidth;
@@ -89,152 +173,30 @@ export default function LDrawViewer({ ldrContent, height = 500 }: LDrawViewerPro
     };
     window.addEventListener("resize", handleResize);
 
-    return () => {
+    // ── Cleanup ───────────────────────────────────────────────────────────
+    const cleanup = () => {
       window.removeEventListener("resize", handleResize);
-      cancelAnimationFrame(animFrameRef.current);
+      cancelAnimationFrame(animFrame);
       controls.dispose();
+      tileGeom.dispose();
+      studGeom.dispose();
       renderer.dispose();
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
       }
-      rendererRef.current = null;
-      sceneRef.current = null;
-      cameraRef.current = null;
-      controlsRef.current = null;
     };
-  }, [height]);
+    cleanupRef.current = cleanup;
 
-  // Load/reload the LDR model when ldrContent changes
-  useEffect(() => {
-    const scene = sceneRef.current;
-    const camera = cameraRef.current;
-    const controls = controlsRef.current;
-    if (!scene || !camera || !controls || !ldrContent) return;
-
-    setLoading(true);
-    setError(null);
-
-    // Remove previous model
-    if (modelRef.current) {
-      scene.remove(modelRef.current);
-      modelRef.current = null;
-    }
-
-    let cancelled = false;
-
-    // Build a fully self-contained packed MPD so the parser never needs
-    // to fetch sub-part files (Three.js FileLoader fails on some hosts).
-    // We fetch LDConfig.ldr (color defs) + library.mpd (all parts packed)
-    // ourselves, combine with the mosaic LDR, and parse in one shot.
-    (async () => {
-      try {
-        const [configResp, libResp] = await Promise.all([
-          fetch(LDRAW_LIBRARY_URL + "LDConfig.ldr"),
-          fetch(LDRAW_LIBRARY_URL + "library.mpd"),
-        ]);
-        if (!configResp.ok) throw new Error(`LDConfig.ldr: HTTP ${configResp.status}`);
-        if (!libResp.ok) throw new Error(`library.mpd: HTTP ${libResp.status}`);
-
-        const [configText, libText] = await Promise.all([
-          configResp.text(),
-          libResp.text(),
-        ]);
-
-        if (cancelled) return;
-
-        // Feed color definitions to the loader via Blob URL
-        const loader = new LDrawLoader();
-        loader.setConditionalLineMaterial(LDrawConditionalLineMaterial);
-        const configBlob = new Blob([configText], { type: "text/plain" });
-        const configBlobUrl = URL.createObjectURL(configBlob);
-        try {
-          await loader.preloadMaterials(configBlobUrl);
-        } finally {
-          URL.revokeObjectURL(configBlobUrl);
-        }
-
-        if (cancelled) return;
-
-        // Build packed MPD: our mosaic as the main model + all library parts
-        const packedMpd = [
-          "0 FILE main.ldr",
-          ldrContent,
-          "0 NOFILE",
-          "",
-          libText,
-        ].join("\n");
-
-        // Parse via Blob URL so the loader sees an MPD file (not raw text)
-        const mpdBlob = new Blob([packedMpd], { type: "text/plain" });
-        const mpdBlobUrl = URL.createObjectURL(mpdBlob);
-
-        loader.load(
-          mpdBlobUrl,
-          (group: THREE.Group) => {
-            URL.revokeObjectURL(mpdBlobUrl);
-            if (cancelled) return;
-
-            // Merge geometries for performance
-            const mergedGroup = LDrawUtils.mergeObject(group);
-            // LDraw Y-axis is inverted relative to Three.js convention
-            mergedGroup.rotateX(-Math.PI);
-
-            // Center the model and fit camera
-            const box = new THREE.Box3().setFromObject(mergedGroup);
-            const center = box.getCenter(new THREE.Vector3());
-            const size = box.getSize(new THREE.Vector3());
-
-            mergedGroup.position.sub(center);
-            scene.add(mergedGroup);
-            modelRef.current = mergedGroup;
-
-            // Position camera to frame the model
-            const maxDim = Math.max(size.x, size.y, size.z);
-            const fov = camera.fov * (Math.PI / 180);
-            const dist = maxDim / (2 * Math.tan(fov / 2)) * 1.5;
-            camera.position.set(dist * 0.8, dist * 0.6, dist * 0.8);
-            camera.lookAt(0, 0, 0);
-            controls.target.set(0, 0, 0);
-            controls.update();
-
-            setLoading(false);
-          },
-          undefined,
-          (err: unknown) => {
-            URL.revokeObjectURL(mpdBlobUrl);
-            if (cancelled) return;
-            console.error("LDraw parse error:", err);
-            setError(err instanceof Error ? err.message : "Failed to parse LDR model");
-            setLoading(false);
-          }
-        );
-      } catch (err) {
-        if (cancelled) return;
-        console.error("LDraw viewer init error:", err);
-        setError(err instanceof Error ? err.message : "Failed to initialize 3D viewer");
-        setLoading(false);
-      }
-    })();
-
-    return () => { cancelled = true; };
-  }, [ldrContent]);
+    return cleanup;
+  }, [colorGrid, widthStuds, heightStuds, height]);
 
   return (
     <div className="relative rounded-xl overflow-hidden border border-slate-700/50">
-      {loading && (
+      {!ready && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-800/80">
           <div className="text-center">
             <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
             <p className="text-sm text-slate-400">Loading 3D preview...</p>
-            <p className="text-xs text-slate-500 mt-1">Parsing LDraw model</p>
-          </div>
-        </div>
-      )}
-      {error && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-800/90">
-          <div className="text-center px-4">
-            <p className="text-sm text-red-400 font-medium">3D Preview Error</p>
-            <p className="text-xs text-slate-500 mt-1">{error}</p>
           </div>
         </div>
       )}

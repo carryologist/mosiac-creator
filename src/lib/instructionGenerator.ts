@@ -16,7 +16,7 @@
 // =============================================================================
 
 import { jsPDF } from 'jspdf';
-import type { MosaicResult, PartsListEntry } from './mosaicEngine';
+import type { MosaicResult, PartsListEntry, PlacedPiece } from './mosaicEngine';
 import type { LegoColor } from './colors';
 import { byLdrawCode } from './colors';
 
@@ -235,7 +235,7 @@ function renderCoverPage(
 function renderColorLegend(
   doc: jsPDF,
   colorMap: Map<number, NumberedColor>,
-  totalPieces: number,
+  totalStuds: number,
 ): void {
   // Header
   doc.setFont('helvetica', 'bold');
@@ -292,8 +292,8 @@ function renderColorLegend(
     doc.text(entry.legoColor.hex, MARGIN + 70, y + 4.2);
 
     // Count and percentage
-    const pct = ((entry.count / totalPieces) * 100).toFixed(1);
-    doc.text(`${entry.count.toLocaleString()} pieces (${pct}%)`, MARGIN + 95, y + 4.2);
+    const pct = ((entry.count / totalStuds) * 100).toFixed(1);
+    doc.text(`${entry.count.toLocaleString()} studs (${pct}%)`, MARGIN + 95, y + 4.2);
   });
 }
 
@@ -527,6 +527,42 @@ function renderSectionPage(
     doc.line(gridX, y, gridX + gridW, y);
   }
 
+  // -- Piece boundaries (optimized mode) -----------------------------------
+  if (result.optimized) {
+    const PIECE_BORDER_COLOR = '#334155';
+    const PIECE_BORDER_WIDTH = 0.4;
+
+    for (const piece of result.optimized.pieces) {
+      const pieceEndRow = piece.row + piece.height;
+      const pieceEndCol = piece.col + piece.width;
+
+      // Skip pieces that don't overlap this section
+      if (piece.row >= endRow || pieceEndRow <= startRow) continue;
+      if (piece.col >= endCol || pieceEndCol <= startCol) continue;
+
+      // Clip to section bounds
+      const clampedR1 = Math.max(piece.row, startRow);
+      const clampedR2 = Math.min(pieceEndRow, endRow);
+      const clampedC1 = Math.max(piece.col, startCol);
+      const clampedC2 = Math.min(pieceEndCol, endCol);
+
+      const localC = clampedC1 - startCol;
+      const localR = clampedR1 - startRow;
+      const localW = clampedC2 - clampedC1;
+      const localH = clampedR2 - clampedR1;
+
+      strokeRect(
+        doc,
+        gridX + localC * cellSize,
+        gridY + localR * cellSize,
+        localW * cellSize,
+        localH * cellSize,
+        PIECE_BORDER_COLOR,
+        PIECE_BORDER_WIDTH,
+      );
+    }
+  }
+
   // -- Per-section parts summary -------------------------------------------
   const summaryY = gridY + gridH + 6;
 
@@ -600,7 +636,8 @@ export function generateInstructionsPDF(result: MosaicResult): Blob {
 
   // Page 2+: Color legend
   doc.addPage();
-  renderColorLegend(doc, colorMap, result.totalPieces);
+  const totalStuds = result.config.widthStuds * result.config.heightStuds;
+  renderColorLegend(doc, colorMap, totalStuds);
 
   // Page N+: Bill of materials
   doc.addPage();
