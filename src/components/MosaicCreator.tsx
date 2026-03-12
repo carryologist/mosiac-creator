@@ -724,7 +724,7 @@ export default function MosaicCreator() {
                       Click and drag to rotate · Scroll to zoom
                     </p>
                   </div>
-                  <LDrawViewer colorGrid={result.colorGrid} widthStuds={result.config.widthStuds} heightStuds={result.config.heightStuds} height={500} />
+                  <LDrawViewer colorGrid={result.colorGrid} widthStuds={result.config.widthStuds} heightStuds={result.config.heightStuds} pieces={result.optimized?.pieces} height={500} />
                 </div>
 
               {/* Stats Row */}
