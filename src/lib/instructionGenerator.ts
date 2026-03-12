@@ -1,23 +1,25 @@
 // =============================================================================
 // Instruction PDF Generator
 //
-// Generates a multi-page PDF instruction booklet for building a LEGO mosaic,
-// following the official LEGO Art instruction style: numbered colors inside a
-// top-down grid, one sub-section per page.
+// Generates a multi-page PDF instruction booklet for building a LEGO mosaic.
 //
 // Pages:
 //   1. Cover — mosaic preview, dimensions, piece count
-//   2. Color legend — sequential number → LEGO color mapping
+//   2. Legend — number → color (non-optimized) or number → part+color (optimized)
 //   3. Bill of materials — parts list table
 //   4+. Section pages — one per 16×16 sub-section, numbered grid with
 //       color fills, major grid lines every 8 studs, piece boundaries
+//
+// When piece optimization is enabled, the numbering scheme changes from
+// "1 = Black, 2 = White" to "1 = Black 3035 (4×8), 2 = Black 3460 (1×8), ..."
+// so that every stud in the grid shows which specific part covers it.
 //
 // Uses jsPDF for vector PDF generation (small file sizes, crisp at any zoom).
 // Zero external API calls — runs entirely in the browser.
 // =============================================================================
 
 import { jsPDF } from 'jspdf';
-import type { MosaicResult, PartsListEntry, PlacedPiece } from './mosaicEngine';
+import type { MosaicResult } from './mosaicEngine';
 import type { LegoColor } from './colors';
 import { byLdrawCode } from './colors';
 
@@ -49,16 +51,30 @@ const MAJOR_LINE_INTERVAL = 8;
 // Types
 // =============================================================================
 
-/** A color used in the mosaic, with its assigned instruction number. */
-interface NumberedColor {
+/** A numbered entry in the instruction legend (color or part+color). */
+interface NumberedEntry {
   /** Sequential number shown in the grid (1, 2, 3, ...) */
   number: number;
   /** LDraw color code */
   ldrawCode: number;
   /** Full LEGO color data */
   legoColor: LegoColor;
-  /** Total count of this color in the mosaic */
+  /** Count: studs (non-optimized) or pieces (optimized) */
   count: number;
+  /** BrickLink part number, e.g. "3035" (optimized mode only) */
+  partId?: string;
+  /** Piece dimensions, e.g. "4×8" (optimized mode only) */
+  pieceDims?: string;
+}
+
+/** Result of the numbering pass used throughout PDF generation. */
+interface NumberingResult {
+  /** Map from sequential number → entry details. */
+  entries: Map<number, NumberedEntry>;
+  /** [row][col] → entry number, for grid cell labels. */
+  grid: number[][];
+  /** True when entries represent part+color combos, false for color-only. */
+  isPartLevel: boolean;
 }
 
 // =============================================================================
@@ -87,12 +103,89 @@ function hexToRgbTuple(hex: string): [number, number, number] {
 }
 
 /**
- * Build the color number mapping from a mosaic result.
- * Colors are sorted by frequency (most common first) and assigned
- * sequential numbers starting from 1.
+ * Build the numbering scheme for instruction pages.
+ *
+ * Non-optimized mode: numbers represent colors, sorted by stud frequency.
+ * Optimized mode: numbers represent unique (part + color) combos, sorted
+ * by piece count descending.
  */
-function buildColorMap(result: MosaicResult): Map<number, NumberedColor> {
-  // Count frequency of each LDraw color code
+function buildNumbering(result: MosaicResult): NumberingResult {
+  const { widthStuds, heightStuds } = result.config;
+
+  if (result.optimized && result.optimized.pieces.length > 0) {
+    // -- Optimized: number by unique (part, color) combos ------------------
+    const pieces = result.optimized.pieces;
+
+    // Count each combo
+    const combos = new Map<string, {
+      ldrawCode: number;
+      partId: string;
+      width: number;
+      height: number;
+      count: number;
+    }>();
+
+    for (const piece of pieces) {
+      const key = `${piece.bricklinkPartNumber}_${piece.ldrawColor}`;
+      let entry = combos.get(key);
+      if (!entry) {
+        entry = {
+          ldrawCode: piece.ldrawColor,
+          partId: piece.bricklinkPartNumber,
+          width: piece.width,
+          height: piece.height,
+          count: 0,
+        };
+        combos.set(key, entry);
+      }
+      entry.count++;
+    }
+
+    // Sort by count descending
+    const sorted = [...combos.entries()].sort((a, b) => b[1].count - a[1].count);
+
+    // Build entries and key→number lookup
+    const entries = new Map<number, NumberedEntry>();
+    const keyToNum = new Map<string, number>();
+    let num = 1;
+
+    for (const [key, combo] of sorted) {
+      const legoColor = byLdrawCode.get(combo.ldrawCode);
+      if (!legoColor) continue;
+      // Canonical dimensions: smaller × larger (matches catalog convention)
+      const lo = Math.min(combo.width, combo.height);
+      const hi = Math.max(combo.width, combo.height);
+      entries.set(num, {
+        number: num,
+        ldrawCode: combo.ldrawCode,
+        legoColor,
+        count: combo.count,
+        partId: combo.partId,
+        pieceDims: `${lo}\u00d7${hi}`,
+      });
+      keyToNum.set(key, num);
+      num++;
+    }
+
+    // Build per-cell grid
+    const grid: number[][] = Array.from(
+      { length: heightStuds },
+      () => new Array<number>(widthStuds).fill(0),
+    );
+    for (const piece of pieces) {
+      const key = `${piece.bricklinkPartNumber}_${piece.ldrawColor}`;
+      const n = keyToNum.get(key) ?? 0;
+      for (let r = piece.row; r < piece.row + piece.height && r < heightStuds; r++) {
+        for (let c = piece.col; c < piece.col + piece.width && c < widthStuds; c++) {
+          grid[r][c] = n;
+        }
+      }
+    }
+
+    return { entries, grid, isPartLevel: true };
+  }
+
+  // -- Non-optimized: number by color --------------------------------------
   const counts = new Map<number, number>();
   for (const row of result.ldrawColorGrid) {
     for (const code of row) {
@@ -100,27 +193,34 @@ function buildColorMap(result: MosaicResult): Map<number, NumberedColor> {
     }
   }
 
-  // Sort by frequency descending
   const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
-
-  const map = new Map<number, NumberedColor>();
+  const entries = new Map<number, NumberedEntry>();
+  const codeToNum = new Map<number, number>();
   let num = 1;
+
   for (const [code, count] of sorted) {
     const legoColor = byLdrawCode.get(code);
     if (!legoColor) continue;
-    map.set(code, {
-      number: num++,
+    entries.set(num, {
+      number: num,
       ldrawCode: code,
       legoColor,
       count,
     });
+    codeToNum.set(code, num);
+    num++;
   }
-  return map;
+
+  const grid: number[][] = result.ldrawColorGrid.map((row) =>
+    row.map((code) => codeToNum.get(code) ?? 0),
+  );
+
+  return { entries, grid, isPartLevel: false };
 }
 
-/** Get the NumberedColor entries sorted by number. */
-function sortedColors(colorMap: Map<number, NumberedColor>): NumberedColor[] {
-  return [...colorMap.values()].sort((a, b) => a.number - b.number);
+/** Get entries sorted by number. */
+function sortedEntries(entries: Map<number, NumberedEntry>): NumberedEntry[] {
+  return [...entries.values()].sort((a, b) => a.number - b.number);
 }
 
 // =============================================================================
@@ -181,7 +281,7 @@ function centeredText(doc: jsPDF, text: string, x: number, y: number, w: number,
 function renderCoverPage(
   doc: jsPDF,
   result: MosaicResult,
-  colorMap: Map<number, NumberedColor>,
+  numbering: NumberingResult,
 ): void {
   const { widthStuds, heightStuds } = result.config;
   const layout = result.config.baseplateLayout;
@@ -203,14 +303,12 @@ function renderCoverPage(
   const gridX = (PAGE_W - gridW) / 2;
   const gridY = 60;
 
-  // Draw cells
   for (let row = 0; row < heightStuds; row++) {
     for (let col = 0; col < widthStuds; col++) {
       const hex = result.colorGrid[row][col];
       fillRect(doc, gridX + col * cellSize, gridY + row * cellSize, cellSize, cellSize, hex);
     }
   }
-  // Border
   strokeRect(doc, gridX, gridY, gridW, gridH, TEXT_MID, 0.3);
 
   // Stats below preview
@@ -219,11 +317,15 @@ function renderCoverPage(
   doc.setFontSize(11);
   setTextColor(doc, TEXT_MID);
 
+  // Count unique colors
+  const uniqueColors = new Set(result.ldrawColorGrid.flat()).size;
+
   const stats = [
-    `${widthStuds} × ${heightStuds} studs`,
-    `${layout.cols} × ${layout.rows} baseplate${layout.cols * layout.rows > 1 ? 's' : ''} (${bpSize}×${bpSize})`,
+    `${widthStuds} \u00d7 ${heightStuds} studs`,
+    `${layout.cols} \u00d7 ${layout.rows} baseplate${layout.cols * layout.rows > 1 ? 's' : ''} (${bpSize}\u00d7${bpSize})`,
     `${result.totalPieces.toLocaleString()} pieces`,
-    `${colorMap.size} colors`,
+    `${uniqueColors} color${uniqueColors !== 1 ? 's' : ''}` +
+      (numbering.isPartLevel ? `, ${numbering.entries.size} unique parts` : ''),
   ];
 
   stats.forEach((line, i) => {
@@ -237,39 +339,48 @@ function renderCoverPage(
 }
 
 /**
- * Render the color legend page mapping numbers to LEGO colors.
+ * Render the legend page.
+ *
+ * Non-optimized: maps numbers to LEGO colors.
+ * Optimized: maps numbers to (part + color) combos.
  */
-function renderColorLegend(
+function renderLegend(
   doc: jsPDF,
-  colorMap: Map<number, NumberedColor>,
+  numbering: NumberingResult,
   totalStuds: number,
 ): void {
+  const isPartLevel = numbering.isPartLevel;
+  const title = isPartLevel ? 'Parts Legend' : 'Color Legend';
+  const subtitle = isPartLevel
+    ? `${numbering.entries.size} unique parts`
+    : `${numbering.entries.size} colors used`;
+
   // Header
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
   setTextColor(doc, TEXT_DARK);
-  doc.text('Color Legend', MARGIN, MARGIN + 8);
+  doc.text(title, MARGIN, MARGIN + 8);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   setTextColor(doc, TEXT_MID);
-  doc.text(`${colorMap.size} colors used`, MARGIN, MARGIN + 15);
+  doc.text(subtitle, MARGIN, MARGIN + 15);
 
   // Legend entries
-  const colors = sortedColors(colorMap);
+  const entries = sortedEntries(numbering.entries);
   const startY = MARGIN + 25;
   const rowHeight = 9;
   const swatchSize = 6;
   const maxPerPage = Math.floor((USABLE_H - 25) / rowHeight);
 
-  colors.forEach((entry, i) => {
+  entries.forEach((entry, i) => {
     const pageIndex = Math.floor(i / maxPerPage);
     if (pageIndex > 0 && i % maxPerPage === 0) {
       doc.addPage();
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(16);
       setTextColor(doc, TEXT_DARK);
-      doc.text('Color Legend (continued)', MARGIN, MARGIN + 8);
+      doc.text(`${title} (continued)`, MARGIN, MARGIN + 8);
     }
 
     const rowI = i % maxPerPage;
@@ -292,15 +403,26 @@ function renderColorLegend(
     setTextColor(doc, TEXT_DARK);
     doc.text(entry.legoColor.name, MARGIN + swatchSize + 4, y + 4.2);
 
-    // Hex value
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    setTextColor(doc, TEXT_MID);
-    doc.text(entry.legoColor.hex, MARGIN + 70, y + 4.2);
+    if (isPartLevel && entry.partId) {
+      // Part info: "3035 (4×8)"
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      setTextColor(doc, TEXT_MID);
+      doc.text(`${entry.partId} (${entry.pieceDims})`, MARGIN + 50, y + 4.2);
 
-    // Count and percentage
-    const pct = ((entry.count / totalStuds) * 100).toFixed(1);
-    doc.text(`${entry.count.toLocaleString()} studs (${pct}%)`, MARGIN + 95, y + 4.2);
+      // Count: "×43"
+      doc.text(`\u00d7${entry.count.toLocaleString()}`, MARGIN + 95, y + 4.2);
+    } else {
+      // Hex value
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      setTextColor(doc, TEXT_MID);
+      doc.text(entry.legoColor.hex, MARGIN + 70, y + 4.2);
+
+      // Count and percentage
+      const pct = ((entry.count / totalStuds) * 100).toFixed(1);
+      doc.text(`${entry.count.toLocaleString()} studs (${pct}%)`, MARGIN + 95, y + 4.2);
+    }
   });
 }
 
@@ -310,7 +432,6 @@ function renderColorLegend(
 function renderBOM(
   doc: jsPDF,
   result: MosaicResult,
-  colorMap: Map<number, NumberedColor>,
 ): void {
   // Header
   doc.setFont('helvetica', 'bold');
@@ -340,7 +461,7 @@ function renderBOM(
   doc.setLineWidth(0.3);
   doc.line(MARGIN, startY + 2, MARGIN + USABLE_W, startY + 2);
 
-  // Table rows from parts list
+  // Table rows
   const maxPerPage = Math.floor((USABLE_H - 30) / rowHeight);
   let rowIndex = 0;
 
@@ -383,7 +504,7 @@ function renderBOM(
   doc.setFontSize(8);
   setTextColor(doc, TEXT_MID);
   doc.text(
-    `+ ${bpCount} × ${layout.baseplate.sizeStuds}×${layout.baseplate.sizeStuds} baseplate (${layout.baseplate.partNumber})`,
+    `+ ${bpCount} \u00d7 ${layout.baseplate.sizeStuds}\u00d7${layout.baseplate.sizeStuds} baseplate (${layout.baseplate.partNumber})`,
     colX.part,
     bpY + rowHeight,
   );
@@ -391,15 +512,11 @@ function renderBOM(
 
 /**
  * Render a section page for one sub-section of the mosaic.
- *
- * Each page covers the rectangle [startRow..endRow) × [startCol..endCol).
- * The gridRow/gridCol/gridRows/gridCols parameters drive the locator
- * thumbnail that shows where this sub-section sits in the overall mosaic.
  */
 function renderSectionPage(
   doc: jsPDF,
   result: MosaicResult,
-  colorMap: Map<number, NumberedColor>,
+  numbering: NumberingResult,
   startRow: number,
   startCol: number,
   endRow: number,
@@ -505,9 +622,8 @@ function renderSectionPage(
       const globalRow = startRow + r;
       const globalCol = startCol + c;
       const hex = result.colorGrid[globalRow][globalCol];
-      const ldrawCode = result.ldrawColorGrid[globalRow][globalCol];
-      const entry = colorMap.get(ldrawCode);
-      const num = entry ? String(entry.number) : '?';
+      const entryNum = numbering.grid[globalRow]?.[globalCol] ?? 0;
+      const numStr = entryNum > 0 ? String(entryNum) : '?';
 
       const cx = gridX + c * cellSize;
       const cy = gridY + r * cellSize;
@@ -515,8 +631,8 @@ function renderSectionPage(
       // Fill with LEGO color
       fillRect(doc, cx, cy, cellSize, cellSize, hex);
 
-      // Color number
-      centeredText(doc, num, cx, cy, cellSize, cellSize, contrastText(hex), numFontSize);
+      // Entry number
+      centeredText(doc, numStr, cx, cy, cellSize, cellSize, contrastText(hex), numFontSize);
     }
   }
 
@@ -590,18 +706,20 @@ function renderSectionPage(
   // -- Per-section parts summary -------------------------------------------
   const summaryY = gridY + gridH + 6;
 
-  // Count colors in this section
+  // Count entry numbers in this section
   const sectionCounts = new Map<number, number>();
   for (let r = startRow; r < endRow; r++) {
     for (let c = startCol; c < endCol; c++) {
-      const code = result.ldrawColorGrid[r][c];
-      sectionCounts.set(code, (sectionCounts.get(code) ?? 0) + 1);
+      const n = numbering.grid[r]?.[c] ?? 0;
+      if (n > 0) {
+        sectionCounts.set(n, (sectionCounts.get(n) ?? 0) + 1);
+      }
     }
   }
 
-  // Sort by color number
+  // Sort by entry number
   const sectionEntries = [...sectionCounts.entries()]
-    .map(([code, count]) => ({ entry: colorMap.get(code)!, count }))
+    .map(([num, count]) => ({ entry: numbering.entries.get(num)!, count }))
     .filter((e) => e.entry)
     .sort((a, b) => a.entry.number - b.entry.number);
 
@@ -650,27 +768,30 @@ function renderSectionPage(
  *
  * The mosaic is divided into 16×16 sub-sections (matching the LEGO Art
  * instruction style). Each sub-section gets its own page with large,
- * readable cells, major grid lines every 8 studs, and a locator thumbnail
- * showing where it sits in the overall mosaic.
+ * readable cells, major grid lines every 8 studs, and a locator thumbnail.
+ *
+ * When piece optimization is enabled, the grid numbering scheme changes
+ * from per-color to per-part+color, so each cell shows which specific
+ * piece covers it.
  *
  * @param result - The mosaic result from generateMosaic()
  * @returns A Blob containing the PDF data, ready for download
  */
 export function generateInstructionsPDF(result: MosaicResult): Blob {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const colorMap = buildColorMap(result);
+  const numbering = buildNumbering(result);
 
   // Page 1: Cover
-  renderCoverPage(doc, result, colorMap);
+  renderCoverPage(doc, result, numbering);
 
-  // Page 2+: Color legend
+  // Page 2+: Legend
   doc.addPage();
   const totalStuds = result.config.widthStuds * result.config.heightStuds;
-  renderColorLegend(doc, colorMap, totalStuds);
+  renderLegend(doc, numbering, totalStuds);
 
   // Page N+: Bill of materials
   doc.addPage();
-  renderBOM(doc, result, colorMap);
+  renderBOM(doc, result);
 
   // Section pages: one per 16×16 sub-section
   const { widthStuds, heightStuds } = result.config;
@@ -686,7 +807,7 @@ export function generateInstructionsPDF(result: MosaicResult): Blob {
       const sr = subR * SUB_SECTION_SIZE;
       const sc = subC * SUB_SECTION_SIZE;
       renderSectionPage(
-        doc, result, colorMap,
+        doc, result, numbering,
         sr,
         sc,
         Math.min(sr + SUB_SECTION_SIZE, heightStuds),
